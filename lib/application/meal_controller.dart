@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
 import '../data/meal_repository.dart';
 import '../domain/meal.dart';
+import '../domain/meal_preferences.dart';
 
 class MealController extends ChangeNotifier {
   MealController({
@@ -13,7 +15,7 @@ class MealController extends ChangeNotifier {
   }) : _repository = repository,
        _clock = clock ?? DateTime.now,
        _random = random ?? Random(),
-       _period = MealPeriod.at((clock ?? DateTime.now)());
+       _period = MealPeriod.at((clock ?? DateTime.now)().toLocal());
 
   final MealRepository _repository;
   final DateTime Function() _clock;
@@ -30,24 +32,64 @@ class MealController extends ChangeNotifier {
   bool _isSaving = false;
   bool _disposed = false;
   String? _error;
+  MealPreferences _preferences = const MealPreferences();
+  final Set<String> _sessionExclusions = {};
+  List<FoodOption>? _roundCandidates;
+  bool _isUpdatingPreferences = false;
+  int _pendingDataChanges = 0;
+  Future<void> _dataChanges = Future.value();
+  Completer<void>? _confirmationFinished;
+  String? _restartNotice;
+  bool _dataUnavailable = false;
 
   MealPeriod get period => _period;
   List<FoodOption> get options => _options;
-  List<FoodOption> get candidates => List.unmodifiable(
-    _options.where((option) => option.periods.contains(_period)),
-  );
+  List<FoodOption> get candidates => _roundCandidates ?? _eligibleCandidates();
+  MealPreferences get preferences => _preferences;
+  Set<String> get sessionExclusions => Set.unmodifiable(_sessionExclusions);
+  bool get isModeLocked => hasRound;
+  bool get isBusy =>
+      _isSaving || _isUpdatingPreferences || _pendingDataChanges > 0;
+  String? get restartNotice => _restartNotice;
+
+  List<FoodOption> _eligibleCandidates() {
+    if (_dataUnavailable) return const [];
+    final now = _clock().toLocal();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = DateTime(now.year, now.month, now.day - 1);
+    final yesterdayIds = _preferences.excludeYesterday
+        ? _history
+              .where((entry) {
+                final time = entry.confirmedAt.toLocal();
+                return !time.isBefore(yesterday) && time.isBefore(today);
+              })
+              .map((entry) => entry.option.id)
+              .toSet()
+        : const <String>{};
+    return List.unmodifiable(
+      _options.where(
+        (option) =>
+            option.periods.contains(_period) &&
+            !_sessionExclusions.contains(option.id) &&
+            !yesterdayIds.contains(option.id),
+      ),
+    );
+  }
+
   FoodOption? get result => _result;
   int? get selectedIndex => _selectedIndex;
   bool get isDrawing => _isDrawing;
   bool get isSaving => _isSaving;
   bool get hasRound => _chosen != null;
-  String? get error => _error;
+  String? get error => _dataUnavailable ? '更新后的本地数据暂时无法读取，请重新打开应用。' : _error;
   List<HistoryEntry> get history => _history;
 
   Future<void> initialize() async {
     try {
       _options = await _repository.options();
       _history = await _repository.history();
+      _preferences = await _repository.preferences();
+      _dataUnavailable = false;
       _error = null;
     } catch (_) {
       _error = '本地数据暂时无法读取，请重新打开应用。';
@@ -58,7 +100,8 @@ class MealController extends ChangeNotifier {
   }
 
   bool startDraw() {
-    if (_isSaving || hasRound) return false;
+    if (isBusy || hasRound) return false;
+    if (_dataUnavailable) return false;
     final pool = candidates;
     if (pool.isEmpty) {
       _error = '这个时段暂无可选餐食，请换个时段。';
@@ -66,6 +109,7 @@ class MealController extends ChangeNotifier {
       return false;
     }
     _selectedIndex = _random.nextInt(pool.length);
+    _roundCandidates = pool;
     _chosen = pool[_selectedIndex!];
     _result = null;
     _isDrawing = true;
@@ -82,7 +126,7 @@ class MealController extends ChangeNotifier {
   }
 
   Future<bool> confirm() async {
-    if (_isSaving || _isDrawing || _result == null) return false;
+    if (isBusy || _isDrawing || _result == null) return false;
     _operation ??= ConfirmationOperation(
       operationId: List.generate(
         16,
@@ -93,6 +137,7 @@ class MealController extends ChangeNotifier {
       option: _result!,
     );
     _isSaving = true;
+    _confirmationFinished = Completer<void>();
     _error = null;
     _notify();
     try {
@@ -110,12 +155,14 @@ class MealController extends ChangeNotifier {
       return false;
     } finally {
       _isSaving = false;
+      _confirmationFinished!.complete();
+      _confirmationFinished = null;
       _notify();
     }
   }
 
   bool changePeriod(MealPeriod period) {
-    if (_isSaving) return false;
+    if (isBusy) return false;
     if (_period == period) return true;
     _clearRound();
     _period = period;
@@ -125,7 +172,7 @@ class MealController extends ChangeNotifier {
   }
 
   bool abandon() {
-    if (_isSaving) return false;
+    if (isBusy) return false;
     _clearRound();
     _error = null;
     _notify();
@@ -133,11 +180,89 @@ class MealController extends ChangeNotifier {
   }
 
   void _clearRound() {
+    _roundCandidates = null;
     _chosen = null;
     _result = null;
     _selectedIndex = null;
     _operation = null;
     _isDrawing = false;
+  }
+
+  // Future controls restart a started round explicitly before changing conditions.
+  Future<bool> updatePreferences(MealPreferences preferences) async {
+    if (isBusy) return false;
+    if (preferences.mode == _preferences.mode &&
+        preferences.excludeYesterday == _preferences.excludeYesterday) {
+      return true;
+    }
+    if (hasRound) return false;
+    _isUpdatingPreferences = true;
+    _notify();
+    try {
+      await _repository.savePreferences(preferences);
+      _preferences = preferences;
+      _error = null;
+      return true;
+    } catch (_) {
+      _error = '偏好暂时无法保存，请重试。';
+      return false;
+    } finally {
+      _isUpdatingPreferences = false;
+      _notify();
+    }
+  }
+
+  // Between-round session actions; replacement will add its own slot transition.
+  bool excludeForSession(String optionId) {
+    if (isBusy ||
+        hasRound ||
+        !_options.any((option) => option.id == optionId)) {
+      return false;
+    }
+    _sessionExclusions.add(optionId);
+    _notify();
+    return true;
+  }
+
+  bool restoreSessionExclusions() {
+    if (isBusy || hasRound) return false;
+    _sessionExclusions.clear();
+    _notify();
+    return true;
+  }
+
+  // Call after a committed library mutation or history deletion in any scenario.
+  // A canceled edit or a save with no actual changes passes changed: false.
+  Future<void> applyDataChange({required bool changed}) {
+    if (!changed) return Future.value();
+    _pendingDataChanges++;
+    _notify();
+    _dataChanges = _dataChanges.then((_) async {
+      await _confirmationFinished?.future;
+      if (hasRound) {
+        _clearRound();
+        _restartNotice = '选项或足迹已更新，这一轮已重置，请重新选择。';
+      }
+      try {
+        _options = await _repository.options();
+        _history = await _repository.history();
+        _dataUnavailable = false;
+        _error = null;
+      } catch (_) {
+        _dataUnavailable = true;
+        _error = '更新后的本地数据暂时无法读取，请重新打开应用。';
+      } finally {
+        _pendingDataChanges--;
+        _notify();
+      }
+    });
+    return _dataChanges;
+  }
+
+  String? takeRestartNotice() {
+    final notice = _restartNotice;
+    _restartNotice = null;
+    return notice;
   }
 
   void _notify() {

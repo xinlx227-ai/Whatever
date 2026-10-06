@@ -1,14 +1,16 @@
 # Whatever — Warm meal
 
-Android-first meal decisions. S01 opens What to eat (吃什么), draws one of eight accepted options with a wheel, and saves an explicitly confirmed choice to local SQLite history. The library is read-only in this slice.
+Android-first meal decisions. S01 opens What to eat (吃什么), draws one of eight accepted options with a wheel, and saves an explicitly confirmed choice to local SQLite history. S02 preserves live sessions across navigation and backgrounding, and starts fresh after task removal or process termination. The library remains read-only.
 
 ## Scope
 
 - [Product specification and slice map](https://github.com/xinlx227-ai/Whatever/issues/1)
 - [S01 acceptance criteria](https://github.com/xinlx227-ai/Whatever/issues/2)
+- [S02 acceptance criteria](https://github.com/xinlx227-ai/Whatever/issues/3)
 - [Domain language](GLOSSARY.md)
 - [Selected visual treatment](docs/design/warm-meal.md)
 - [Verification evidence and workstation notes](docs/verification/s01-android.md)
+- [S02 lifecycle evidence and integration contracts](docs/verification/s02-android.md)
 
 Later slices retain all three scenarios, card mode, replacements, and editable libraries. The browser comparison under `prototype/visual-directions/` is historical design material; variant A is selected. Its adjustable preview controls are not application settings.
 
@@ -42,10 +44,11 @@ The APK is written to `build/app/outputs/flutter-apk/app-release.apk` and suppor
 ## Implementation boundaries
 
 - `lib/domain/meal.dart`: accepted identities, meal periods, and confirmation data.
+- `lib/domain/meal_preferences.dart`: durable mode and yesterday-filter preferences; their future controls remain hidden.
 - `lib/application/meal_controller.dart`: eligible selection and temporary round state; animation cannot influence probability.
 - `lib/data/meal_repository.dart`: SQLite schema and atomic, idempotent confirmation. Fault seams simulate rollback after a header write and lost acknowledgement after commit.
 - `lib/presentation/`: Chinese UI, responsive layout, animation, navigation, and feedback.
 - `test/`: real SQLite application journeys and widget interaction checks.
 - `integration_test/`: native Android draw-to-durable-history smoke journey.
 
-Unconfirmed rounds remain in memory. Confirmation fixes an operation ID and payload before writing; retries reuse them, preventing duplicate records after lost acknowledgements. The database stores UTC instants and the UI groups records by local calendar date.
+Unconfirmed rounds and session exclusions remain in memory. Root Back moves the Android task home; removing the task destroys its engine. SQLite schema v2 adds preferences without replacing existing options or history. Confirmation fixes an operation ID and payload before writing; retries reuse them, preventing duplicate records after lost acknowledgements. The database stores UTC instants and the UI groups records by local calendar date.

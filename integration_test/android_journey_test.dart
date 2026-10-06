@@ -35,8 +35,32 @@ void main() {
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
     final chosen = controller.result!;
     expect(find.text(chosen.name), findsWidgets);
+    for (final destination in ['选项库', '足迹']) {
+      await tester.tap(find.text(destination));
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('draw-result')), findsOneWidget);
+      expect(controller.result!.id, chosen.id);
+      expect(find.byType(AlertDialog), findsNothing);
+    }
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('先放下这一餐？'), findsOneWidget);
+    await tester.tap(find.text('继续这一餐'));
+    await tester.pumpAndSettle();
+    expect(controller.result!.id, chosen.id);
     await tester.ensureVisible(find.byKey(const Key('primary-action')));
     await tester.tap(find.byKey(const Key('primary-action')));
+    await tester.pumpAndSettle();
+    expect(controller.hasRound, isFalse);
+    expect(controller.history, hasLength(1));
+    await tester.ensureVisible(find.byKey(const Key('primary-action')));
+    await tester.tap(find.byKey(const Key('primary-action')));
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('放弃这次选择'));
     await tester.pumpAndSettle();
     expect(controller.hasRound, isFalse);
     expect(controller.history, hasLength(1));

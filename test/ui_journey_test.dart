@@ -331,6 +331,68 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Back dismisses the transient prompt before touching the round', (
+    tester,
+  ) async {
+    await mount(tester);
+    final selected = await draw(tester);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(tester.widget<Text>(result).data, selected);
+    expect(controller.isModeLocked, isTrue);
+  });
+
+  testWidgets(
+    'lifecycle pause and resume preserve animation choice and manual period',
+    (tester) async {
+      await mount(tester);
+      await tapPrimary(tester);
+      await tester.pump(const Duration(milliseconds: 500));
+      final selectedIndex = controller.selectedIndex;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump(const Duration(seconds: 10));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(controller.selectedIndex, selectedIndex);
+      expect(controller.period, MealPeriod.lunch);
+      expect(result, findsOneWidget);
+      await expectStored(tester, 0);
+    },
+  );
+
+  testWidgets(
+    'data changes cancel active animation and explain reset on tab return',
+    (tester) async {
+      await mount(tester);
+      await tapPrimary(tester);
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tap(find.text('选项库'));
+      await tester.pump();
+      expect(controller.isDrawing, isTrue);
+      await tester.runAsync(() => controller.applyDataChange(changed: true));
+      await tester.pumpAndSettle();
+      expect(find.text('选项或足迹已更新，这一轮已重置，请重新选择。'), findsNothing);
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('选项或足迹已更新，这一轮已重置，请重新选择。'), findsOneWidget);
+      expect(result, findsNothing);
+      expect(find.text('转一下，开饭'), findsOneWidget);
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 5));
+      expect(result, findsNothing);
+      await expectStored(tester, 0);
+    },
+  );
+
   testWidgets(
     'system reduced motion reveals promptly with the same save flow',
     (tester) async {

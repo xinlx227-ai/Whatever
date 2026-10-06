@@ -61,12 +61,13 @@ class _MealHome extends StatefulWidget {
 }
 
 class _MealHomeState extends State<_MealHome>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController spin;
   late final CurvedAnimation curve;
   int tab = 1;
   final completionKey = GlobalKey();
   double fromAngle = 0, toAngle = 0;
+  bool asking = false;
   MealController get model => widget.controller;
 
   @override
@@ -77,13 +78,46 @@ class _MealHomeState extends State<_MealHome>
       duration: const Duration(seconds: 4),
     );
     curve = CurvedAnimation(parent: spin, curve: const Cubic(.12, .64, .13, 1));
+    model.addListener(modelChanged);
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    model.removeListener(modelChanged);
     curve.dispose();
     spin.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) showCompletion();
+  }
+
+  void modelChanged() {
+    if (!model.hasRound) resetWheel();
+    if (model.restartNotice != null) showRestartNotice();
+  }
+
+  void showRestartNotice() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || tab != 1) return;
+      final notice = model.takeRestartNotice();
+      if (notice == null) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(notice)));
+    });
+  }
+
+  void selectTab(int value) {
+    setState(() => tab = value);
+    if (value == 1) {
+      showCompletion();
+      showRestartNotice();
+    }
   }
 
   Future<void> draw() async {
@@ -106,7 +140,10 @@ class _MealHomeState extends State<_MealHome>
       model.finishDraw();
       showCompletion();
       // Android's platform feedback honors the user's system haptic setting.
-      await HapticFeedback.lightImpact();
+      final lifecycle = WidgetsBinding.instance.lifecycleState;
+      if (lifecycle == null || lifecycle == AppLifecycleState.resumed) {
+        await HapticFeedback.lightImpact();
+      }
     } on TickerCanceled {
       /* Abandonment cancels the visual reveal. */
     }
@@ -128,25 +165,32 @@ class _MealHomeState extends State<_MealHome>
     });
   }
 
-  Future<bool> ask(String title, String message, String action) async =>
-      await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text(title),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('继续这一餐'),
+  Future<bool> ask(String title, String message, String action) async {
+    if (asking) return false;
+    asking = true;
+    try {
+      return await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text(title),
+              content: Text(message),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('继续这一餐'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: Text(action),
+                ),
+              ],
             ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: Text(action),
-            ),
-          ],
-        ),
-      ) ??
-      false;
+          ) ??
+          false;
+    } finally {
+      asking = false;
+    }
+  }
 
   void resetWheel() {
     spin.stop(canceled: true);
@@ -155,12 +199,12 @@ class _MealHomeState extends State<_MealHome>
   }
 
   Future<void> selectPeriod(MealPeriod period) async {
-    if (period == model.period || model.isSaving) return;
+    if (period == model.period || model.isBusy) return;
     if (model.hasRound &&
         !await ask('换个餐段？', '当前还未确认的选择会清空，再为你准备这一餐。', '切换并重新开始')) {
       return;
     }
-    if (!mounted || model.isSaving) return;
+    if (!mounted || model.isBusy) return;
     resetWheel();
     model.changePeriod(period);
   }
@@ -179,10 +223,10 @@ class _MealHomeState extends State<_MealHome>
 
   Future<void> back() async {
     if (tab != 1) {
-      setState(() => tab = 1);
+      selectTab(1);
       return;
     }
-    if (model.isSaving) return;
+    if (model.isBusy) return;
     if (model.hasRound &&
         await ask(
           '先放下这一餐？',
@@ -191,8 +235,7 @@ class _MealHomeState extends State<_MealHome>
               : '放弃后，这次未确认的选择不会记入足迹。',
           '放弃这次选择',
         )) {
-      resetWheel();
-      model.abandon();
+      if (mounted) model.abandon();
     }
   }
 
@@ -200,7 +243,7 @@ class _MealHomeState extends State<_MealHome>
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: model,
     builder: (context, _) => PopScope(
-      canPop: tab == 1 && !model.hasRound && !model.isSaving,
+      canPop: tab == 1 && !model.hasRound && !model.isBusy,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) back();
       },
@@ -260,10 +303,7 @@ class _MealHomeState extends State<_MealHome>
           backgroundColor: paper,
           indicatorColor: soft,
           selectedIndex: tab,
-          onDestinationSelected: (value) {
-            setState(() => tab = value);
-            if (value == 1) showCompletion();
-          },
+          onDestinationSelected: selectTab,
           destinations: const [
             NavigationDestination(
               icon: Icon(Icons.menu_book_outlined),
@@ -313,7 +353,7 @@ class _MealHomeState extends State<_MealHome>
             (period) => ChoiceChip(
               label: Text(period.label),
               selected: model.period == period,
-              onSelected: model.isSaving ? null : (_) => selectPeriod(period),
+              onSelected: model.isBusy ? null : (_) => selectPeriod(period),
               selectedColor: soft,
               showCheckmark: false,
               side: BorderSide(
@@ -412,7 +452,7 @@ class _MealHomeState extends State<_MealHome>
       ),
     FilledButton(
       key: const Key('primary-action'),
-      onPressed: model.isDrawing || model.isSaving
+      onPressed: model.isDrawing || model.isBusy
           ? null
           : model.result == null
           ? draw
@@ -534,7 +574,7 @@ class _MealHomeState extends State<_MealHome>
                 const Text('确认一次选择，就会在这里留下足迹。', style: TextStyle(color: muted)),
                 const SizedBox(height: 32),
                 FilledButton(
-                  onPressed: () => setState(() => tab = 1),
+                  onPressed: () => selectTab(1),
                   child: const Text('去决定这一餐'),
                 ),
               ],

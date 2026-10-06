@@ -8,6 +8,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:whatever/application/meal_controller.dart';
 import 'package:whatever/data/meal_repository.dart';
 import 'package:whatever/domain/meal.dart';
+import 'package:whatever/domain/meal_preferences.dart';
 
 class IndexRandom implements Random {
   int index = 0;
@@ -432,6 +433,206 @@ void main() {
       await reopen();
       expect(controller.history.length, 2);
       expect(controller.history.first.confirmedAt, now.toUtc());
+    },
+  );
+
+  test(
+    'session exclusions survive abandon, confirmation and period changes only',
+    () async {
+      expect(controller.excludeForSession('soy-milk'), isTrue);
+      expect(controller.excludeForSession('missing'), isFalse);
+      draw();
+      expect(controller.isModeLocked, isTrue);
+      expect(
+        controller.candidates.map((option) => option.id),
+        isNot(contains('soy-milk')),
+      );
+      expect(controller.abandon(), isTrue);
+      expect(controller.isModeLocked, isFalse);
+      controller.changePeriod(MealPeriod.dinner);
+      draw();
+      expect(await controller.confirm(), isTrue);
+      expect(controller.sessionExclusions, {'soy-milk'});
+      draw();
+      await reopen();
+      expect(controller.hasRound, isFalse);
+      expect(controller.isModeLocked, isFalse);
+      expect(controller.sessionExclusions, isEmpty);
+      expect(controller.period, MealPeriod.lunch);
+      expect(controller.history, hasLength(1));
+    },
+  );
+
+  test(
+    'mode is locked by drawing and preferences alone survive fresh launch',
+    () async {
+      const preference = MealPreferences(
+        mode: DrawMode.cards,
+        excludeYesterday: true,
+      );
+      expect(await controller.updatePreferences(preference), isTrue);
+      expect(controller.startDraw(), isTrue);
+      expect(
+        await controller.updatePreferences(const MealPreferences()),
+        isFalse,
+      );
+      controller.finishDraw();
+      controller.changePeriod(MealPeriod.lateNight);
+      now = DateTime(2026, 10, 7, 7);
+      await reopen();
+      expect(controller.preferences.mode, DrawMode.cards);
+      expect(controller.preferences.excludeYesterday, isTrue);
+      expect(controller.period, MealPeriod.breakfast);
+      expect(controller.hasRound, isFalse);
+      expect(
+        await controller.updatePreferences(const MealPreferences()),
+        isTrue,
+      );
+      await reopen();
+      expect(controller.preferences.mode, DrawMode.wheel);
+      expect(controller.preferences.excludeYesterday, isFalse);
+    },
+  );
+
+  test(
+    'yesterday scope freezes at draw and refreshes after midnight abandonment',
+    () async {
+      now = DateTime(2026, 10, 5, 12);
+      draw();
+      final oldOption = controller.result!;
+      expect(await controller.confirm(), isTrue);
+      now = DateTime(2026, 10, 6, 23, 59);
+      expect(
+        await controller.updatePreferences(
+          const MealPreferences(excludeYesterday: true),
+        ),
+        isTrue,
+      );
+      expect(
+        controller.candidates.map((option) => option.id),
+        isNot(contains(oldOption.id)),
+      );
+      draw();
+      final frozen = controller.candidates.map((option) => option.id).toList();
+      now = DateTime(2026, 10, 7, 0, 1);
+      expect(controller.candidates.map((option) => option.id), frozen);
+      expect(controller.period, MealPeriod.lunch);
+      controller.abandon();
+      expect(
+        controller.candidates.map((option) => option.id),
+        contains(oldOption.id),
+      );
+    },
+  );
+
+  test(
+    'committed mutations invalidate but canceled and unchanged edits preserve',
+    () async {
+      controller.excludeForSession('soy-milk');
+      draw();
+      final chosen = controller.result;
+      await controller.applyDataChange(changed: false);
+      expect(controller.result, same(chosen));
+      expect(controller.isModeLocked, isTrue);
+      final database = await databaseFactoryFfi.openDatabase(databasePath);
+      await database.update(
+        'options',
+        {'name': '更新后的餐食'},
+        where: 'id = ?',
+        whereArgs: [chosen!.id],
+      );
+      await controller.applyDataChange(changed: true);
+      expect(controller.hasRound, isFalse);
+      expect(controller.isModeLocked, isFalse);
+      expect(controller.sessionExclusions, {'soy-milk'});
+      expect(
+        controller.options.firstWhere((option) => option.id == chosen.id).name,
+        '更新后的餐食',
+      );
+      expect(controller.takeRestartNotice(), isNotNull);
+      expect(controller.takeRestartNotice(), isNull);
+      expect(controller.history, isEmpty);
+    },
+  );
+
+  test(
+    'history deletion refreshes yesterday eligibility and invalidates a round',
+    () async {
+      now = DateTime(2026, 10, 5, 12);
+      draw();
+      final saved = controller.result!;
+      await controller.confirm();
+      now = DateTime(2026, 10, 6, 12);
+      await controller.updatePreferences(
+        const MealPreferences(excludeYesterday: true),
+      );
+      draw();
+      final database = await databaseFactoryFfi.openDatabase(databasePath);
+      await database.transaction((transaction) async {
+        await transaction.delete('history_items');
+        await transaction.delete('history_records');
+      });
+      await controller.applyDataChange(changed: true);
+      expect(controller.hasRound, isFalse);
+      expect(controller.history, isEmpty);
+      expect(
+        controller.candidates.map((option) => option.id),
+        contains(saved.id),
+      );
+    },
+  );
+
+  test(
+    'unreadable mutated data stays blocked with feedback until refreshed',
+    () async {
+      draw();
+      final database = await databaseFactoryFfi.openDatabase(databasePath);
+      await database.execute(
+        'ALTER TABLE options RENAME TO unavailable_options',
+      );
+      await controller.applyDataChange(changed: true);
+      expect(controller.hasRound, isFalse);
+      expect(controller.candidates, isEmpty);
+      expect(controller.error, contains('重新打开'));
+      controller.changePeriod(MealPeriod.dinner);
+      controller.abandon();
+      await controller.updatePreferences(
+        const MealPreferences(excludeYesterday: true),
+      );
+      expect(controller.startDraw(), isFalse);
+      expect(controller.error, contains('重新打开'));
+      await database.execute(
+        'ALTER TABLE unavailable_options RENAME TO options',
+      );
+      await controller.applyDataChange(changed: true);
+      expect(controller.error, isNull);
+      draw();
+    },
+  );
+
+  test(
+    'invalidation waits for in-flight confirmation without duplicating history',
+    () async {
+      final entered = Completer<void>();
+      final release = Completer<void>();
+      fault = (phase) async {
+        if (phase == ConfirmationPhase.afterHeaderWritten) {
+          entered.complete();
+          await release.future;
+        }
+      };
+      draw();
+      final saving = controller.confirm();
+      await entered.future;
+      final invalidation = controller.applyDataChange(changed: true);
+      expect(controller.startDraw(), isFalse);
+      expect(controller.abandon(), isFalse);
+      release.complete();
+      expect(await saving, isTrue);
+      await invalidation;
+      expect(controller.isBusy, isFalse);
+      expect(controller.hasRound, isFalse);
+      await expectStoredCounts(1, 1);
     },
   );
 }

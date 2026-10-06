@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:sqflite_common/sqlite_api.dart';
 
 import '../domain/meal.dart';
+import '../domain/meal_preferences.dart';
 
 enum ConfirmationPhase { afterHeaderWritten, beforeAcknowledgement }
 
@@ -22,7 +23,7 @@ class MealRepository {
     final database = await factory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-        version: 1,
+        version: 2,
         onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
         onCreate: (database, version) async {
           await database.execute('''
@@ -68,10 +69,47 @@ class MealRepository {
               });
             }
           }
+          await _createPreferences(database);
+        },
+        onUpgrade: (database, oldVersion, newVersion) async {
+          if (oldVersion < 2) {
+            await _createPreferences(database);
+          }
         },
       ),
     );
     return MealRepository._(database, onConfirmationPhase);
+  }
+
+  static Future<void> _createPreferences(DatabaseExecutor database) async {
+    await database.execute('''
+      CREATE TABLE preferences (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        mode TEXT NOT NULL CHECK (mode IN ('wheel', 'cards')),
+        exclude_yesterday INTEGER NOT NULL CHECK (exclude_yesterday IN (0, 1))
+      )
+    ''');
+    await database.insert('preferences', {
+      'id': 1,
+      'mode': DrawMode.wheel.name,
+      'exclude_yesterday': 0,
+    });
+  }
+
+  Future<MealPreferences> preferences() async {
+    final row = (await _database.query('preferences')).single;
+    return MealPreferences(
+      mode: DrawMode.values.byName(row['mode']! as String),
+      excludeYesterday: row['exclude_yesterday'] == 1,
+    );
+  }
+
+  Future<void> savePreferences(MealPreferences preferences) async {
+    await _database.insert('preferences', {
+      'id': 1,
+      'mode': preferences.mode.name,
+      'exclude_yesterday': preferences.excludeYesterday ? 1 : 0,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<List<FoodOption>> options() => _options(_database);
