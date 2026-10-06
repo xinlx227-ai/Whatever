@@ -4,6 +4,8 @@ Updated: 2026-10-05, Asia/Shanghai.
 
 ## Resume here
 
+S01 implementation began on 2026-10-06 under [Issue #2](https://github.com/xinlx227-ai/Whatever/issues/2). See the [repository entry point](../../README.md) and [verification evidence](../verification/s01-android.md) for current executable work; the planning-only instructions below describe the earlier planning session.
+
 This is historical planning context recording confirmed product decisions, superseded proposals, and remaining questions. The product specification and vertical-slice tracker now live in [GitHub issue #1](https://github.com/xinlx227-ai/Whatever/issues/1) and its child issues. Use those issues for current scope, acceptance criteria, and blocking relationships; reconcile this handoff when decisions change rather than maintaining competing specifications. Publication does not validate unresolved framework, recognition, content, or visual choices.
 
 The product-boundary discussion is closed for this round: the user accepted the final batched boundary decisions and requested consolidation of the overall plan, page flows, and technical choices. Continue with the [overall planning synthesis](meal-app-overall-plan.md), which distinguishes accepted behavior from proposed organization and technical validation. Do not reopen confirmed choices without a concrete conflict or resume a sequence of minor approval questions. Explain genuinely unresolved proposals with examples. Continue planning, not app implementation, unless requested.

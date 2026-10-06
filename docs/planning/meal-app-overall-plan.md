@@ -4,6 +4,8 @@ Updated: 2026-10-05, Asia/Shanghai.
 
 ## Status and authority
 
+Implementation continuation: S01 began on 2026-10-06 under [Issue #2](https://github.com/xinlx227-ai/Whatever/issues/2). Current build/test evidence lives in [S01 verification](../verification/s01-android.md); the proposed technical sections below retain their historical planning role.
+
 This is supporting planning context. The [product specification and vertical-slice map](https://github.com/xinlx227-ai/Whatever/issues/1) and its child issues are the formal scope, acceptance criteria, and dependency tracker. The [planning handoff](meal-app-handoff.md) preserves historical accepted behavior and superseded proposals. The user authorized issue publication and repository commit/push on 2026-10-05; this task does not start app implementation or adopt unresolved technical choices.
 
 Sections marked **accepted** summarize existing decisions. Sections marked **proposed** are recommendations for review or technical validation. Chinese UI strings are working copy. Keep technical recommendations separate from accepted product behavior.
