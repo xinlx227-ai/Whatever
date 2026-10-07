@@ -8,10 +8,20 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../application/meal_controller.dart';
 import '../domain/meal.dart';
 import 'wheel.dart';
+import 'option_art.dart';
+import 'option_library.dart';
+import 'option_editor.dart';
 
 class MealApp extends StatelessWidget {
-  const MealApp({super.key, required this.controller});
+  const MealApp({
+    super.key,
+    required this.controller,
+    this.recoveredImage,
+    this.imageRecoveryNotice,
+  });
   final MealController controller;
+  final String? recoveredImage;
+  final String? imageRecoveryNotice;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -49,13 +59,23 @@ class MealApp extends StatelessWidget {
         ),
       ),
     ),
-    home: _MealHome(controller: controller),
+    home: _MealHome(
+      controller: controller,
+      recoveredImage: recoveredImage,
+      imageRecoveryNotice: imageRecoveryNotice,
+    ),
   );
 }
 
 class _MealHome extends StatefulWidget {
-  const _MealHome({required this.controller});
+  const _MealHome({
+    required this.controller,
+    this.recoveredImage,
+    this.imageRecoveryNotice,
+  });
   final MealController controller;
+  final String? recoveredImage;
+  final String? imageRecoveryNotice;
   @override
   State<_MealHome> createState() => _MealHomeState();
 }
@@ -80,6 +100,48 @@ class _MealHomeState extends State<_MealHome>
     curve = CurvedAnimation(parent: spin, curve: const Cubic(.12, .64, .13, 1));
     model.addListener(modelChanged);
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => recoverImage());
+  }
+
+  Future<void> recoverImage() async {
+    if (!mounted) return;
+    if (widget.imageRecoveryNotice != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(widget.imageRecoveryNotice!)));
+    }
+    if (widget.recoveredImage == null) return;
+    final use = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('找回了刚才选择的图片'),
+        content: const Text(
+          '应用重新打开了，未保存的表单没有保留。可以用这张图片新建选项；如需修改已有选项，请回选项库重新编辑。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('稍后再选'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('用图片新建'),
+          ),
+        ],
+      ),
+    );
+    if (use == true && mounted) {
+      selectTab(0);
+      await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => OptionEditor(
+            controller: model,
+            initialImagePath: widget.recoveredImage,
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -417,7 +479,7 @@ class _MealHomeState extends State<_MealHome>
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  foodArt(model.result!.art, 64),
+                  OptionArt(option: model.result!, size: 64),
                   const SizedBox(width: 12),
                   Flexible(
                     child: Column(
@@ -483,68 +545,7 @@ class _MealHomeState extends State<_MealHome>
     child: SvgPicture.asset('assets/food/$type.svg', width: size, height: size),
   );
 
-  List<Widget> library() => [
-    const SizedBox(height: 32),
-    const Text(
-      '每一餐的灵感',
-      style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
-    ),
-    const SizedBox(height: 8),
-    const Text('8 个小小提案，总有一口合心意。', style: TextStyle(color: muted)),
-    const SizedBox(height: 24),
-    LayoutBuilder(
-      builder: (context, constraints) {
-        final single =
-            MediaQuery.textScalerOf(context).scale(14) > 21 ||
-            constraints.maxWidth < 280;
-        return Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: model.options
-              .map(
-                (food) => Container(
-                  width: single
-                      ? constraints.maxWidth
-                      : (constraints.maxWidth - 12) / 2,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xfffffdf8),
-                    border: Border.all(color: const Color(0xffe9ddcb)),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(child: foodArt(food.art, 76)),
-                      const SizedBox(height: 8),
-                      Text(
-                        food.name,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        MealPeriod.values
-                            .where(food.periods.contains)
-                            .map((period) => period.label)
-                            .join(' · '),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: muted,
-                          height: 1.6,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-              .toList(),
-        );
-      },
-    ),
-  ];
+  List<Widget> library() => [OptionLibrary(controller: model)];
 
   List<Widget> history() {
     final widgets = <Widget>[
@@ -609,7 +610,7 @@ class _MealHomeState extends State<_MealHome>
           ),
           child: Row(
             children: [
-              foodArt(entry.option.art, 60),
+              OptionArt(option: entry.option, size: 60),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(

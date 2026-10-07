@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 
@@ -20,6 +23,9 @@ class _Bootstrap extends StatefulWidget {
 class _BootstrapState extends State<_Bootstrap> {
   MealController? controller;
   bool failed = false;
+  String? recoveredImage;
+  String? imageRecoveryNotice;
+  bool checkedPicker = false;
 
   @override
   void initState() {
@@ -37,6 +43,19 @@ class _BootstrapState extends State<_Bootstrap> {
       );
       final next = MealController(repository: repository);
       await next.initialize();
+      if (!checkedPicker && Platform.isAndroid) {
+        checkedPicker = true;
+        try {
+          final lost = await ImagePicker().retrieveLostData();
+          if (lost.files?.isNotEmpty ?? false) {
+            recoveredImage = lost.files!.first.path;
+          } else if (lost.exception != null) {
+            imageRecoveryNotice = '上次选择的图片未能读取，请在编辑时重新选择。';
+          }
+        } catch (_) {
+          imageRecoveryNotice = '上次选择的图片未能读取，请在编辑时重新选择。';
+        }
+      }
       if (mounted) {
         setState(() => controller = next);
       } else {
@@ -51,7 +70,13 @@ class _BootstrapState extends State<_Bootstrap> {
 
   @override
   Widget build(BuildContext context) {
-    if (controller != null) return MealApp(controller: controller!);
+    if (controller != null) {
+      return MealApp(
+        controller: controller!,
+        recoveredImage: recoveredImage,
+        imageRecoveryNotice: imageRecoveryNotice,
+      );
+    }
     return MaterialApp(
       home: Scaffold(
         backgroundColor: const Color(0xfffffaf1),

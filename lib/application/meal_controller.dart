@@ -38,18 +38,24 @@ class MealController extends ChangeNotifier {
   bool _isUpdatingPreferences = false;
   int _pendingDataChanges = 0;
   Future<void> _dataChanges = Future.value();
+  Future<void> _libraryChanges = Future.value();
+  int _pendingLibraryChanges = 0;
   Completer<void>? _confirmationFinished;
   String? _restartNotice;
   bool _dataUnavailable = false;
 
   MealPeriod get period => _period;
+  MealPeriod get currentLocalPeriod => MealPeriod.at(_clock().toLocal());
   List<FoodOption> get options => _options;
   List<FoodOption> get candidates => _roundCandidates ?? _eligibleCandidates();
   MealPreferences get preferences => _preferences;
   Set<String> get sessionExclusions => Set.unmodifiable(_sessionExclusions);
   bool get isModeLocked => hasRound;
   bool get isBusy =>
-      _isSaving || _isUpdatingPreferences || _pendingDataChanges > 0;
+      _isSaving ||
+      _isUpdatingPreferences ||
+      _pendingDataChanges > 0 ||
+      _pendingLibraryChanges > 0;
   String? get restartNotice => _restartNotice;
 
   List<FoodOption> _eligibleCandidates() {
@@ -69,6 +75,9 @@ class MealController extends ChangeNotifier {
     return List.unmodifiable(
       _options.where(
         (option) =>
+            option.scenario == 'eat' &&
+            option.isActive &&
+            !option.isDeleted &&
             option.periods.contains(_period) &&
             !_sessionExclusions.contains(option.id) &&
             !yesterdayIds.contains(option.id),
@@ -83,6 +92,92 @@ class MealController extends ChangeNotifier {
   bool get hasRound => _chosen != null;
   String? get error => _dataUnavailable ? '更新后的本地数据暂时无法读取，请重新打开应用。' : _error;
   List<HistoryEntry> get history => _history;
+
+  // Include retained deleted options; cleanup must never rely on a filtered UI.
+  Future<Set<String>> imagePathsInUse() async => {
+    for (final option in await _repository.options())
+      if (option.imagePath != null) option.imagePath!,
+  };
+
+  List<FoodOption> libraryOptions({
+    String scenario = 'eat',
+    String query = '',
+    LibraryStatus status = LibraryStatus.active,
+  }) {
+    final search = normalizedOptionName(query);
+    return List.unmodifiable(
+      _options.where(
+        (option) =>
+            option.scenario == scenario &&
+            !option.isDeleted &&
+            (status == LibraryStatus.all ||
+                option.isActive == (status == LibraryStatus.active)) &&
+            normalizedOptionName(option.name).contains(search),
+      ),
+    );
+  }
+
+  Future<OptionMutationResult> saveOption({
+    String? id,
+    required String name,
+    required Set<MealPeriod> periods,
+    String category = '未分类',
+    String scenario = 'eat',
+    String? imagePath,
+    bool confirmRestore = false,
+    bool confirmSameFood = false,
+  }) {
+    // Snapshot mutable form input before entering the serialized write queue.
+    final selectedPeriods = Set<MealPeriod>.of(periods);
+    return _mutateLibrary(
+      () => _repository.saveOption(
+        id: id,
+        name: name,
+        periods: selectedPeriods,
+        category: category,
+        scenario: scenario,
+        imagePath: imagePath,
+        confirmRestore: confirmRestore,
+        confirmSameFood: confirmSameFood,
+      ),
+    );
+  }
+
+  Future<OptionMutationResult> setOptionActive(String id, bool active) =>
+      _mutateLibrary(() => _repository.setOptionActive(id, active));
+
+  Future<OptionMutationResult> deleteOption(String id) =>
+      _mutateLibrary(() => _repository.deleteOption(id));
+
+  Future<OptionMutationResult> _mutateLibrary(
+    Future<OptionMutationResult> Function() mutation,
+  ) {
+    final result = Completer<OptionMutationResult>();
+    _pendingLibraryChanges++;
+    _notify();
+    _libraryChanges = _libraryChanges.then((_) async {
+      try {
+        // Reserve the action boundary before waiting: a confirmation cannot start
+        // between the durable write and the invalidation of its old draw pool.
+        await _confirmationFinished?.future;
+        await _dataChanges;
+        final outcome = await mutation();
+        if (outcome.changed) await applyDataChange(changed: true);
+        result.complete(outcome);
+      } catch (_) {
+        result.complete(
+          const OptionMutationResult(
+            OptionMutationStatus.failed,
+            message: '选项暂时无法保存，请重试。',
+          ),
+        );
+      } finally {
+        _pendingLibraryChanges--;
+        _notify();
+      }
+    });
+    return result.future;
+  }
 
   Future<void> initialize() async {
     try {
