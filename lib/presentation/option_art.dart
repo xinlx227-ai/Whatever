@@ -12,9 +12,11 @@ class OptionArt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget fallback() => option.art == 'plate'
+    Widget fallback() => option.art == 'plate' || option.art == 'storefront'
         ? Icon(
-            Icons.restaurant_outlined,
+            option.art == 'storefront'
+                ? Icons.storefront_outlined
+                : Icons.restaurant_outlined,
             size: size * .65,
             color: Theme.of(context).colorScheme.primary,
           )

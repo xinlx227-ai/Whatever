@@ -11,9 +11,15 @@ const muted = Color(0xff776658);
 const soft = Color(0xfff4e9d8);
 
 class MealWheel extends StatelessWidget {
-  const MealWheel({super.key, required this.options, required this.angle});
+  const MealWheel({
+    super.key,
+    required this.options,
+    required this.angle,
+    this.centerLabel = '开饭',
+  });
   final List<FoodOption> options;
   final double angle;
+  final String centerLabel;
 
   @override
   Widget build(BuildContext context) => ExcludeSemantics(
@@ -40,10 +46,13 @@ class MealWheel extends StatelessWidget {
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white, width: 5),
             ),
-            child: const Center(
+            child: Center(
               child: Text(
-                '开饭',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                centerLabel,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ),
@@ -102,16 +111,29 @@ class _WheelPainter extends CustomPainter {
       final label = TextPainter(
         text: TextSpan(
           text: options[i].name,
-          style: const TextStyle(
+          style: TextStyle(
             color: ink,
-            fontSize: 12,
+            fontSize: options.length > 6 ? 11 : 12,
             fontWeight: FontWeight.w600,
           ),
         ),
         textDirection: TextDirection.ltr,
-      )..layout();
-      label.paint(canvas, Offset(-label.width / 2, -radius * .73));
-      canvas.drawCircle(Offset(0, -radius * .49), 2.5, Paint()..color = muted);
+        maxLines: 1,
+        ellipsis: '…',
+      )..layout(maxWidth: options.length > 6 ? radius - 48 : radius);
+      if (options.length > 6) {
+        // Radial labels fit dense candidate pools; the result shows the full name.
+        canvas.translate(0, -radius * .7);
+        canvas.rotate(-math.pi / 2);
+        label.paint(canvas, Offset(-label.width / 2, -label.height / 2));
+      } else {
+        label.paint(canvas, Offset(-label.width / 2, -radius * .73));
+        canvas.drawCircle(
+          Offset(0, -radius * .49),
+          2.5,
+          Paint()..color = muted,
+        );
+      }
       canvas.restore();
     }
     canvas.drawCircle(

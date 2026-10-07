@@ -25,7 +25,7 @@ class MealRepository {
     final database = await factory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-        version: 3,
+        version: 4,
         onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
         onCreate: (database, version) async {
           await database.execute('''
@@ -58,21 +58,9 @@ class MealRepository {
               UNIQUE (operation_id, option_id)
             )
           ''');
-          for (final option in seedOptions) {
-            await database.insert('options', {
-              'id': option.id,
-              'name': option.name,
-              'art': option.art,
-            });
-            for (final period in option.periods) {
-              await database.insert('option_periods', {
-                'option_id': option.id,
-                'period': period.name,
-              });
-            }
-          }
           await _createPreferences(database);
           await _addLibraryMetadata(database);
+          await _addScenarioMetadata(database);
         },
         onUpgrade: (database, oldVersion, newVersion) async {
           if (oldVersion < 2) {
@@ -81,10 +69,95 @@ class MealRepository {
           if (oldVersion < 3) {
             await _addLibraryMetadata(database);
           }
+          if (oldVersion < 4) {
+            await _addScenarioMetadata(database);
+          }
         },
       ),
     );
     return MealRepository._(database, onConfirmationPhase);
+  }
+
+  static Future<void> _addScenarioMetadata(DatabaseExecutor database) async {
+    await database.execute('ALTER TABLE options ADD COLUMN address TEXT');
+    await database.execute('ALTER TABLE options ADD COLUMN notes TEXT');
+    await database.execute('''
+      CREATE TABLE option_categories (
+        option_id TEXT NOT NULL REFERENCES options(id),
+        category TEXT NOT NULL,
+        PRIMARY KEY (option_id, category)
+      )
+    ''');
+    await database.execute('''
+      INSERT INTO option_categories (option_id, category)
+      SELECT id, category FROM options
+    ''');
+    for (final seed in seedOptions) {
+      final existing = await database.query(
+        'options',
+        where: 'id = ?',
+        whereArgs: [seed.id],
+      );
+      if (existing.isNotEmpty && existing.single['is_builtin'] != 1) continue;
+      if (existing.isEmpty) {
+        final sameScenario = await database.query(
+          'options',
+          columns: ['name'],
+          where: 'scenario = ?',
+          whereArgs: [seed.scenario],
+        );
+        // Existing identities, including inactive and retained deleted options,
+        // take precedence over newly introduced content with the same name.
+        final normalizedSeedName = normalizedOptionName(seed.name);
+        if (sameScenario.any(
+          (row) =>
+              normalizedOptionName(row['name']! as String) ==
+              normalizedSeedName,
+        )) {
+          continue;
+        }
+        await database.insert('options', {
+          'id': seed.id,
+          'name': seed.name,
+          'art': seed.art,
+          'scenario': seed.scenario,
+          'category': seed.category,
+        });
+      } else {
+        // System content changes never replace display edits or stable identity.
+        await database.update(
+          'options',
+          {'scenario': seed.scenario, 'category': seed.category},
+          where: 'id = ?',
+          whereArgs: [seed.id],
+        );
+      }
+      await database.delete(
+        'option_categories',
+        where: 'option_id = ?',
+        whereArgs: [seed.id],
+      );
+      for (final category in seed.categories) {
+        await database.insert('option_categories', {
+          'option_id': seed.id,
+          'category': category,
+        });
+      }
+      // Restaurant applicability belongs to the user once the option exists.
+      if (existing.isEmpty || seed.scenario != MealScenario.restaurant.name) {
+        await database.delete(
+          'option_periods',
+          where: 'option_id = ?',
+          whereArgs: [seed.id],
+        );
+        for (final period in seed.periods) {
+          await database.insert('option_periods', {
+            'option_id': seed.id,
+            'period': period.name,
+          });
+        }
+      }
+    }
   }
 
   static Future<void> _addLibraryMetadata(DatabaseExecutor database) async {
@@ -136,6 +209,7 @@ class MealRepository {
   Future<List<FoodOption>> _options(DatabaseExecutor executor) async {
     final rows = await executor.query('options', orderBy: 'rowid');
     final periods = await executor.query('option_periods');
+    final categories = await executor.query('option_categories');
     return List.unmodifiable(
       rows.map(
         (row) => FoodOption(
@@ -144,10 +218,17 @@ class MealRepository {
           art: row['art']! as String,
           scenario: row['scenario']! as String,
           category: row['category']! as String,
+          categories: Set.unmodifiable(
+            categories
+                .where((category) => category['option_id'] == row['id'])
+                .map((category) => category['category']! as String),
+          ),
           isBuiltIn: row['is_builtin'] == 1,
           isActive: row['is_active'] == 1,
           isDeleted: row['is_deleted'] == 1,
           imagePath: row['image_path'] as String?,
+          address: row['address'] as String?,
+          notes: row['notes'] as String?,
           periods: Set.unmodifiable(
             periods
                 .where((period) => period['option_id'] == row['id'])
@@ -168,6 +249,8 @@ class MealRepository {
     String category = '未分类',
     String scenario = 'eat',
     String? imagePath,
+    String? address,
+    String? notes,
     bool confirmRestore = false,
     bool confirmSameFood = false,
   }) => _database.transaction((transaction) async {
@@ -176,7 +259,7 @@ class MealRepository {
     if (displayName.isEmpty ||
         periods.isEmpty ||
         displayCategory.isEmpty ||
-        scenario.trim().isEmpty) {
+        !MealScenario.values.any((value) => value.name == scenario)) {
       return const OptionMutationResult(
         OptionMutationStatus.invalid,
         message: '请填写名称、一个分类，并至少选择一个适用时段。',
@@ -197,7 +280,8 @@ class MealRepository {
       if (original.scenario != scenario ||
           (original.isBuiltIn &&
               (original.category != displayCategory ||
-                  !_samePeriods(original.periods, periods)))) {
+                  (scenario != MealScenario.restaurant.name &&
+                      !_samePeriods(original.periods, periods))))) {
         return OptionMutationResult(
           OptionMutationStatus.invalid,
           option: original,
@@ -249,13 +333,24 @@ class MealRepository {
           original?.id ??
           'custom-${List.generate(16, (_) => _idRandom.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}',
       name: displayName,
-      art: original?.art ?? 'plate',
+      art:
+          original?.art ??
+          (scenario == MealScenario.restaurant.name ? 'storefront' : 'plate'),
       periods: Set.unmodifiable(periods),
       scenario: scenario,
       category: displayCategory,
+      categories: original?.isBuiltIn == true
+          ? original!.categories
+          : {displayCategory},
       isBuiltIn: original?.isBuiltIn ?? false,
       isActive: original?.isDeleted == true ? true : original?.isActive ?? true,
       imagePath: imagePath ?? original?.imagePath,
+      address: scenario == MealScenario.restaurant.name
+          ? _optionalText(address, original?.address)
+          : null,
+      notes: scenario == MealScenario.restaurant.name
+          ? _optionalText(notes, original?.notes)
+          : null,
     );
     if (original != null && _sameOption(original, option)) {
       return OptionMutationResult(
@@ -272,6 +367,8 @@ class MealRepository {
       'is_active': option.isActive ? 1 : 0,
       'is_deleted': 0,
       'image_path': option.imagePath,
+      'address': option.address,
+      'notes': option.notes,
     };
     if (original == null) {
       await transaction.insert('options', {'id': option.id, ...values});
@@ -288,6 +385,17 @@ class MealRepository {
         whereArgs: [option.id],
       );
     }
+    await transaction.delete(
+      'option_categories',
+      where: 'option_id = ?',
+      whereArgs: [option.id],
+    );
+    for (final category in option.categories) {
+      await transaction.insert('option_categories', {
+        'option_id': option.id,
+        'category': category,
+      });
+    }
     for (final period in option.periods) {
       await transaction.insert('option_periods', {
         'option_id': option.id,
@@ -297,6 +405,12 @@ class MealRepository {
     return OptionMutationResult(OptionMutationStatus.saved, option: option);
   });
 
+  static String? _optionalText(String? value, String? original) => value == null
+      ? original
+      : value.trim().isEmpty
+      ? null
+      : value.trim();
+
   static bool _samePeriods(Set<MealPeriod> first, Set<MealPeriod> second) =>
       first.length == second.length && first.containsAll(second);
 
@@ -304,6 +418,8 @@ class MealRepository {
       first.name == second.name &&
       first.category == second.category &&
       first.imagePath == second.imagePath &&
+      first.address == second.address &&
+      first.notes == second.notes &&
       first.isActive == second.isActive &&
       first.isDeleted == second.isDeleted &&
       _samePeriods(first.periods, second.periods);

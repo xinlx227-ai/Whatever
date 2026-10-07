@@ -4,6 +4,8 @@ Updated: 2026-10-05, Asia/Shanghai.
 
 ## Resume here
 
+S04 implementation on 2026-10-07 applies the user's subsequently approved complete eating inventory, Rice bowl meals (盖饭套餐) label, frozen cooking memberships, independent page scenario selections, and shared Decide meal period. Earlier unresolved-content notes below are historical. See [Issue #5](https://github.com/xinlx227-ai/Whatever/issues/5) for slice ownership and [S04 delivery evidence](../verification/s04-android.md) for implementation and specification synchronization status.
+
 S01 implementation began on 2026-10-06 under [Issue #2](https://github.com/xinlx227-ai/Whatever/issues/2). See the [repository entry point](../../README.md) and [verification evidence](../verification/s01-android.md) for current executable work; the planning-only instructions below describe the earlier planning session.
 
 This is historical planning context recording confirmed product decisions, superseded proposals, and remaining questions. The product specification and vertical-slice tracker now live in [GitHub issue #1](https://github.com/xinlx227-ai/Whatever/issues/1) and its child issues. Use those issues for current scope, acceptance criteria, and blocking relationships; reconcile this handoff when decisions change rather than maintaining competing specifications. Publication does not validate unresolved framework, recognition, content, or visual choices.

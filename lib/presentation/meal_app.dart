@@ -11,6 +11,8 @@ import 'wheel.dart';
 import 'option_art.dart';
 import 'option_library.dart';
 import 'option_editor.dart';
+import 'scenario_selector.dart';
+import 'scenario_copy.dart';
 
 class MealApp extends StatelessWidget {
   const MealApp({
@@ -85,10 +87,12 @@ class _MealHomeState extends State<_MealHome>
   late final AnimationController spin;
   late final CurvedAnimation curve;
   int tab = 1;
+  MealScenario libraryScenario = MealScenario.eat;
   final completionKey = GlobalKey();
   double fromAngle = 0, toAngle = 0;
   bool asking = false;
   MealController get model => widget.controller;
+  ScenarioCopy get scenarioCopy => ScenarioCopy.forScenario(model.scenario);
 
   @override
   void initState() {
@@ -137,6 +141,7 @@ class _MealHomeState extends State<_MealHome>
         MaterialPageRoute(
           builder: (_) => OptionEditor(
             controller: model,
+            scenario: libraryScenario,
             initialImagePath: widget.recoveredImage,
           ),
         ),
@@ -271,13 +276,24 @@ class _MealHomeState extends State<_MealHome>
     model.changePeriod(period);
   }
 
+  Future<void> selectScenario(MealScenario scenario) async {
+    if (scenario == model.scenario || model.isBusy) return;
+    if (model.hasRound &&
+        !await ask('换个场景？', '当前还未确认的选择会清空，再为你准备这一餐。', '切换并重新开始')) {
+      return;
+    }
+    if (!mounted || model.isBusy) return;
+    resetWheel();
+    model.changeScenario(scenario);
+  }
+
   Future<void> confirm() async {
     if (await model.confirm() && mounted) {
       resetWheel();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('这一餐已记入足迹，好好享用吧'),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(scenarioCopy.confirmationNotice),
+          duration: const Duration(seconds: 2),
         ),
       );
     }
@@ -343,7 +359,9 @@ class _MealHomeState extends State<_MealHome>
                             borderRadius: BorderRadius.circular(24),
                           ),
                           child: Text(
-                            '${model.period.label} · 吃什么',
+                            tab == 0
+                                ? libraryScenario.label
+                                : '${model.period.label} · ${model.scenario.label}',
                             style: const TextStyle(fontSize: 13),
                           ),
                         ),
@@ -397,9 +415,13 @@ class _MealHomeState extends State<_MealHome>
       ),
     ),
     const SizedBox(height: 8),
-    const Text(
-      '今天，吃点什么？',
-      style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, height: 1.3),
+    Text(
+      scenarioCopy.heading,
+      style: const TextStyle(
+        fontSize: 30,
+        fontWeight: FontWeight.w800,
+        height: 1.3,
+      ),
     ),
     const SizedBox(height: 8),
     const Text(
@@ -407,12 +429,19 @@ class _MealHomeState extends State<_MealHome>
       style: TextStyle(color: muted, fontSize: 13),
     ),
     const SizedBox(height: 12),
+    ScenarioSelector(
+      page: 'decide',
+      selected: model.scenario,
+      onSelected: model.isBusy ? null : selectScenario,
+    ),
+    const SizedBox(height: 8),
     Wrap(
       spacing: 8,
       runSpacing: 4,
       children: MealPeriod.values
           .map(
             (period) => ChoiceChip(
+              key: ValueKey('decide-period-${period.name}'),
               label: Text(period.label),
               selected: model.period == period,
               onSelected: model.isBusy ? null : (_) => selectPeriod(period),
@@ -451,13 +480,15 @@ class _MealHomeState extends State<_MealHome>
           maxWidth:
               (MediaQuery.sizeOf(context).height -
                       MediaQuery.paddingOf(context).vertical -
-                      470)
+                      // Reserve both control rows, confirmation and navigation.
+                      570)
                   .clamp(220.0, 330.0),
         ),
         child: AnimatedBuilder(
           animation: curve,
           builder: (context, _) => MealWheel(
             options: model.candidates,
+            centerLabel: scenarioCopy.wheelLabel,
             angle: MediaQuery.disableAnimationsOf(context) && model.isDrawing
                 ? toAngle
                 : fromAngle + (toAngle - fromAngle) * curve.value,
@@ -485,9 +516,9 @@ class _MealHomeState extends State<_MealHome>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          '这一餐，就吃点喜欢的',
-                          style: TextStyle(color: muted, fontSize: 12),
+                        Text(
+                          scenarioCopy.resultHint,
+                          style: const TextStyle(color: muted, fontSize: 12),
                         ),
                         Text(
                           model.result!.name,
@@ -497,6 +528,18 @@ class _MealHomeState extends State<_MealHome>
                             fontWeight: FontWeight.w800,
                           ),
                         ),
+                        if (model.scenario == MealScenario.restaurant &&
+                            model.result!.address != null)
+                          Text(
+                            model.result!.address!,
+                            style: const TextStyle(color: muted),
+                          ),
+                        if (model.scenario == MealScenario.restaurant &&
+                            model.result!.notes != null)
+                          Text(
+                            model.result!.notes!,
+                            style: const TextStyle(color: muted),
+                          ),
                       ],
                     ),
                   ),
@@ -527,8 +570,8 @@ class _MealHomeState extends State<_MealHome>
             : model.result != null
             ? model.error != null
                   ? '重试保存'
-                  : '就吃这个'
-            : '转一下，开饭',
+                  : scenarioCopy.confirmAction
+            : scenarioCopy.drawAction,
       ),
     ),
     const SizedBox(height: 12),
@@ -545,7 +588,14 @@ class _MealHomeState extends State<_MealHome>
     child: SvgPicture.asset('assets/food/$type.svg', width: size, height: size),
   );
 
-  List<Widget> library() => [OptionLibrary(controller: model)];
+  List<Widget> library() => [
+    OptionLibrary(
+      controller: model,
+      scenario: libraryScenario,
+      onScenarioChanged: (scenario) =>
+          setState(() => libraryScenario = scenario),
+    ),
+  ];
 
   List<Widget> history() {
     final widgets = <Widget>[
@@ -625,7 +675,7 @@ class _MealHomeState extends State<_MealHome>
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')} · ${entry.period.label} · 吃什么',
+                      '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')} · ${entry.period.label} · ${MealScenario.fromKey(entry.option.scenario).label}',
                       style: const TextStyle(color: muted, fontSize: 12),
                     ),
                   ],

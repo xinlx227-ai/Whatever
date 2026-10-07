@@ -22,6 +22,7 @@ class MealController extends ChangeNotifier {
   final Random _random;
   final Random _operationRandom = Random.secure();
   MealPeriod _period;
+  MealScenario _scenario = MealScenario.eat;
   List<FoodOption> _options = const [];
   List<HistoryEntry> _history = const [];
   FoodOption? _chosen;
@@ -45,6 +46,7 @@ class MealController extends ChangeNotifier {
   bool _dataUnavailable = false;
 
   MealPeriod get period => _period;
+  MealScenario get scenario => _scenario;
   MealPeriod get currentLocalPeriod => MealPeriod.at(_clock().toLocal());
   List<FoodOption> get options => _options;
   List<FoodOption> get candidates => _roundCandidates ?? _eligibleCandidates();
@@ -75,7 +77,7 @@ class MealController extends ChangeNotifier {
     return List.unmodifiable(
       _options.where(
         (option) =>
-            option.scenario == 'eat' &&
+            option.scenario == _scenario.name &&
             option.isActive &&
             !option.isDeleted &&
             option.periods.contains(_period) &&
@@ -124,6 +126,8 @@ class MealController extends ChangeNotifier {
     String category = '未分类',
     String scenario = 'eat',
     String? imagePath,
+    String? address,
+    String? notes,
     bool confirmRestore = false,
     bool confirmSameFood = false,
   }) {
@@ -137,6 +141,8 @@ class MealController extends ChangeNotifier {
         category: category,
         scenario: scenario,
         imagePath: imagePath,
+        address: address,
+        notes: notes,
         confirmRestore: confirmRestore,
         confirmSameFood: confirmSameFood,
       ),
@@ -199,7 +205,7 @@ class MealController extends ChangeNotifier {
     if (_dataUnavailable) return false;
     final pool = candidates;
     if (pool.isEmpty) {
-      _error = '这个时段暂无可选餐食，请换个时段。';
+      _error = '这个时段暂无可选选项，请换个时段或到选项库添加。';
       _notify();
       return false;
     }
@@ -261,6 +267,17 @@ class MealController extends ChangeNotifier {
     if (_period == period) return true;
     _clearRound();
     _period = period;
+    _error = null;
+    _notify();
+    return true;
+  }
+
+  // Presentation obtains restart consent before changing a started round.
+  bool changeScenario(MealScenario scenario) {
+    if (isBusy) return false;
+    if (_scenario == scenario) return true;
+    _clearRound();
+    _scenario = scenario;
     _error = null;
     _notify();
     return true;

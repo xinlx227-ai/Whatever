@@ -69,7 +69,7 @@ void main() {
     expect(find.text(chosen.name), findsOneWidget);
     await tester.tap(find.text('选项库'));
     await tester.pumpAndSettle();
-    expect(controller.options, hasLength(8));
+    expect(controller.options, hasLength(70));
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     controller.dispose();

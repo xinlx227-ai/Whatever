@@ -17,12 +17,14 @@ class OptionEditor extends StatefulWidget {
     this.initialImagePath,
     this.pickImage,
     this.images,
+    this.scenario = MealScenario.eat,
   });
   final MealController controller;
   final FoodOption? option;
   final String? initialImagePath;
   final Future<String?> Function()? pickImage;
   final OptionImages? images;
+  final MealScenario scenario;
 
   @override
   State<OptionEditor> createState() => _OptionEditorState();
@@ -31,6 +33,8 @@ class OptionEditor extends StatefulWidget {
 class _OptionEditorState extends State<OptionEditor> {
   final form = GlobalKey<FormState>();
   late final TextEditingController name;
+  late final TextEditingController address;
+  late final TextEditingController notes;
   late Set<MealPeriod> periods;
   late String category;
   String? selectedImage;
@@ -42,8 +46,14 @@ class _OptionEditorState extends State<OptionEditor> {
   bool leaving = false;
   bool asking = false;
   FoodOption? get original => widget.option;
+  MealScenario get scenario => original == null
+      ? widget.scenario
+      : MealScenario.fromKey(original!.scenario);
+  bool get isRestaurant => scenario == MealScenario.restaurant;
   bool get dirty =>
       name.text != (original?.name ?? '') ||
+      address.text != (original?.address ?? '') ||
+      notes.text != (original?.notes ?? '') ||
       selectedImage != null ||
       category != (original?.category ?? '未分类') ||
       !setEqualsPeriods(periods, initialPeriods);
@@ -57,6 +67,8 @@ class _OptionEditorState extends State<OptionEditor> {
     super.initState();
     images = widget.images ?? OptionImages();
     name = TextEditingController(text: original?.name ?? '');
+    address = TextEditingController(text: original?.address ?? '');
+    notes = TextEditingController(text: original?.notes ?? '');
     initialPeriods = {...?original?.periods};
     if (original == null) {
       initialPeriods.add(widget.controller.currentLocalPeriod);
@@ -65,6 +77,8 @@ class _OptionEditorState extends State<OptionEditor> {
     category = original?.category ?? '未分类';
     selectedImage = widget.initialImagePath;
     name.addListener(refresh);
+    address.addListener(refresh);
+    notes.addListener(refresh);
   }
 
   void refresh() {
@@ -81,6 +95,10 @@ class _OptionEditorState extends State<OptionEditor> {
     );
     name.removeListener(refresh);
     name.dispose();
+    address.removeListener(refresh);
+    address.dispose();
+    notes.removeListener(refresh);
+    notes.dispose();
     super.dispose();
   }
 
@@ -147,7 +165,7 @@ class _OptionEditorState extends State<OptionEditor> {
     final action = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('已有同名餐食'),
+        title: Text(isRestaurant ? '已有同名餐厅' : '已有同名餐食'),
         content: Text(
           '“${option.name}”${option.isActive ? '已在选项库中' : '目前已停用'}，不会创建重复选项。'
           '${!option.isActive && !option.isDeleted ? '重新启用会保留原有资料，本次表单内容不会保存。' : ''}',
@@ -182,7 +200,7 @@ class _OptionEditorState extends State<OptionEditor> {
                 OptionArt(option: option, size: 100),
                 const SizedBox(height: 12),
                 Text(
-                  '${option.category} · ${option.isDeleted
+                  '${option.categories.join(' / ')} · ${option.isDeleted
                       ? '已删除'
                       : option.isActive
                       ? '已启用'
@@ -194,6 +212,8 @@ class _OptionEditorState extends State<OptionEditor> {
                       .map((period) => period.label)
                       .join(' · '),
                 ),
+                if (option.address != null) Text(option.address!),
+                if (option.notes != null) Text(option.notes!),
               ],
             ),
           ),
@@ -240,8 +260,10 @@ class _OptionEditorState extends State<OptionEditor> {
           id: original?.id,
           name: name.text,
           periods: periods,
-          scenario: original?.scenario ?? 'eat',
+          scenario: scenario.name,
           category: category,
+          address: isRestaurant ? address.text : null,
+          notes: isRestaurant ? notes.text : null,
           imagePath: ownedImage ?? original?.imagePath,
           confirmRestore: restore,
           confirmSameFood: sameFood,
@@ -277,9 +299,11 @@ class _OptionEditorState extends State<OptionEditor> {
         } else if (result.status ==
             OptionMutationStatus.renameConfirmationRequired) {
           if (await ask(
-            '还是同一种餐食吗？',
-            '如果只是修改叫法，可以保留原来的足迹关联；如果换成了另一种餐食，请另建选项。',
-            '是同一种，保存',
+            isRestaurant ? '还是同一家餐厅吗？' : '还是同一种餐食吗？',
+            isRestaurant
+                ? '如果只是修改叫法，可以保留原来的足迹关联；如果换成了另一家餐厅，请另建选项。'
+                : '如果只是修改叫法，可以保留原来的足迹关联；如果换成了另一种餐食，请另建选项。',
+            isRestaurant ? '是同一家，保存' : '是同一种，保存',
           )) {
             sameFood = true;
             continue;
@@ -315,7 +339,15 @@ class _OptionEditorState extends State<OptionEditor> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(original == null ? '添一道喜欢的' : '编辑选项'),
+          title: Text(
+            original == null
+                ? isRestaurant
+                      ? '添加喜欢的餐厅'
+                      : '添一道喜欢的'
+                : isRestaurant
+                ? '编辑餐厅'
+                : '编辑选项',
+          ),
           leading: IconButton(
             tooltip: '返回',
             onPressed: busy ? null : close,
@@ -339,16 +371,44 @@ class _OptionEditorState extends State<OptionEditor> {
                         controller: name,
                         enabled: !busy,
                         maxLength: 120,
-                        decoration: const InputDecoration(
-                          labelText: '名称',
-                          hintText: '例如：番茄鸡蛋面',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: isRestaurant ? '餐厅名称' : '名称',
+                          hintText: isRestaurant ? '例如：街角小馆' : '例如：番茄鸡蛋面',
+                          border: const OutlineInputBorder(),
                         ),
                         validator: (value) =>
                             value == null || value.trim().isEmpty
                             ? '请填写名称。'
                             : null,
                       ),
+                      if (isRestaurant) ...[
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          key: const Key('option-address'),
+                          controller: address,
+                          enabled: !busy,
+                          maxLength: 300,
+                          maxLines: 2,
+                          decoration: const InputDecoration(
+                            labelText: '地址（选填）',
+                            hintText: '填写附近门店或具体地址',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          key: const Key('option-notes'),
+                          controller: notes,
+                          enabled: !busy,
+                          maxLength: 500,
+                          maxLines: 3,
+                          decoration: const InputDecoration(
+                            labelText: '备注（选填）',
+                            hintText: '例如：想点的菜、营业时间',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 8),
                       const Text('图片（选填）'),
                       const SizedBox(height: 12),
@@ -374,7 +434,8 @@ class _OptionEditorState extends State<OptionEditor> {
                               FoodOption(
                                 id: '',
                                 name: '',
-                                art: 'plate',
+                                art: isRestaurant ? 'storefront' : 'plate',
+                                scenario: scenario.name,
                                 periods: periods,
                               ),
                           size: 100,
@@ -388,12 +449,14 @@ class _OptionEditorState extends State<OptionEditor> {
                       const Text('未选图片时使用系统插画。'),
                       const SizedBox(height: 24),
                       DropdownButtonFormField<String>(
+                        key: const Key('option-category'),
                         initialValue: category,
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: '分类',
                           border: OutlineInputBorder(),
                         ),
-                        items: {category, '未分类'}
+                        items: {category, ...scenarioCategories[scenario]!}
                             .map(
                               (value) => DropdownMenuItem(
                                 value: value,
@@ -405,6 +468,15 @@ class _OptionEditorState extends State<OptionEditor> {
                             ? null
                             : (value) => setState(() => category = value!),
                       ),
+                      if (locked && original!.categories.length > 1)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Text(
+                            '所属分类：${original!.categories.join(' · ')}',
+                            key: const Key('option-category-memberships'),
+                            style: const TextStyle(height: 1.5),
+                          ),
+                        ),
                       const SizedBox(height: 24),
                       const Text(
                         '适用餐段（至少一项）',
@@ -419,7 +491,7 @@ class _OptionEditorState extends State<OptionEditor> {
                               (period) => FilterChip(
                                 label: Text(period.label),
                                 selected: periods.contains(period),
-                                onSelected: busy || locked
+                                onSelected: busy || (locked && !isRestaurant)
                                     ? null
                                     : (selected) => setState(() {
                                         if (selected) {
@@ -433,9 +505,13 @@ class _OptionEditorState extends State<OptionEditor> {
                             .toList(),
                       ),
                       if (locked)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 12),
-                          child: Text('内置餐食的分类与餐段由系统维护。'),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Text(
+                            isRestaurant
+                                ? '内置餐厅的分类由系统维护，餐段可按门店情况调整。'
+                                : '内置餐食的分类与餐段由系统维护。',
+                          ),
                         ),
                       if (error != null)
                         Padding(

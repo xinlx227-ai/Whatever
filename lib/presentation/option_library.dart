@@ -4,11 +4,19 @@ import '../application/meal_controller.dart';
 import '../domain/meal.dart';
 import 'option_art.dart';
 import 'option_editor.dart';
+import 'scenario_selector.dart';
 import 'wheel.dart';
 
 class OptionLibrary extends StatefulWidget {
-  const OptionLibrary({super.key, required this.controller});
+  const OptionLibrary({
+    super.key,
+    required this.controller,
+    this.scenario = MealScenario.eat,
+    this.onScenarioChanged,
+  });
   final MealController controller;
+  final MealScenario scenario;
+  final ValueChanged<MealScenario>? onScenarioChanged;
   @override
   State<OptionLibrary> createState() => _OptionLibraryState();
 }
@@ -24,7 +32,11 @@ class _OptionLibraryState extends State<OptionLibrary> {
     await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) => OptionEditor(controller: model, option: option),
+        builder: (_) => OptionEditor(
+          controller: model,
+          option: option,
+          scenario: widget.scenario,
+        ),
       ),
     );
   }
@@ -67,7 +79,11 @@ class _OptionLibraryState extends State<OptionLibrary> {
 
   @override
   Widget build(BuildContext context) {
-    final foods = model.libraryOptions(query: query, status: status);
+    final foods = model.libraryOptions(
+      scenario: widget.scenario.name,
+      query: query,
+      status: status,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -79,6 +95,12 @@ class _OptionLibraryState extends State<OptionLibrary> {
         const SizedBox(height: 8),
         const Text('留下喜欢的，让下一餐多一点期待。', style: TextStyle(color: muted)),
         const SizedBox(height: 20),
+        ScenarioSelector(
+          page: 'library',
+          selected: widget.scenario,
+          onSelected: busy || model.isBusy ? null : widget.onScenarioChanged,
+        ),
+        const SizedBox(height: 12),
         FilledButton.icon(
           key: const Key('create-option'),
           onPressed: busy || model.isBusy ? null : () => edit(),
@@ -89,10 +111,10 @@ class _OptionLibraryState extends State<OptionLibrary> {
         TextField(
           key: const Key('library-search'),
           onChanged: (value) => setState(() => query = value),
-          decoration: const InputDecoration(
-            labelText: '搜索吃什么',
-            prefixIcon: Icon(Icons.search),
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: '搜索${widget.scenario.label}',
+            prefixIcon: const Icon(Icons.search),
+            border: const OutlineInputBorder(),
           ),
         ),
         const SizedBox(height: 12),
@@ -124,9 +146,13 @@ class _OptionLibraryState extends State<OptionLibrary> {
           ),
         const SizedBox(height: 16),
         if (foods.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 32),
-            child: Text('暂时没有符合条件的选项，试试其他筛选或添一道喜欢的。'),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 32),
+            child: Text(
+              widget.scenario == MealScenario.restaurant
+                  ? '暂时没有符合条件的餐厅，试试其他筛选或添加一家喜欢的。'
+                  : '暂时没有符合条件的选项，试试其他筛选或添一道喜欢的。',
+            ),
           ),
         for (final food in foods)
           Padding(
@@ -162,7 +188,7 @@ class _OptionLibraryState extends State<OptionLibrary> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '${food.category} · ${food.isBuiltIn ? '内置' : '自选'} · ${food.isActive ? '已启用' : '已停用'}',
+                                '${food.categories.join(' / ')} · ${food.isBuiltIn ? '内置' : '自选'} · ${food.isActive ? '已启用' : '已停用'}',
                                 style: const TextStyle(
                                   color: muted,
                                   fontSize: 12,
@@ -179,6 +205,20 @@ class _OptionLibraryState extends State<OptionLibrary> {
                                   fontSize: 12,
                                 ),
                               ),
+                              if (food.address != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  food.address!,
+                                  style: const TextStyle(color: muted),
+                                ),
+                              ],
+                              if (food.notes != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  food.notes!,
+                                  style: const TextStyle(color: muted),
+                                ),
+                              ],
                             ],
                           ),
                         ),

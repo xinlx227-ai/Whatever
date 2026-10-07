@@ -209,7 +209,10 @@ void main() {
       final upgraded = await open();
       expectPreferences(await upgraded.preferences());
       final options = await upgraded.options();
-      expect(options.map((option) => option.id), [legacyOption.id, 'rice']);
+      expect(options.map((option) => option.id), [
+        legacyOption.id,
+        ...seedOptions.map((option) => option.id),
+      ]);
       expect(options.first.name, legacyOption.name);
       expect(options.first.art, legacyOption.art);
       expect(options.first.periods, legacyOption.periods);
@@ -246,7 +249,7 @@ void main() {
       expect(history.option.periods, legacyOption.periods);
       final database = await inspect();
       try {
-        expect(await database.getVersion(), 3);
+        expect(await database.getVersion(), 4);
         expect(await database.query('history_records'), hasLength(1));
         expect(await database.query('history_items'), hasLength(1));
         expect(await database.rawQuery('PRAGMA foreign_key_check'), isEmpty);

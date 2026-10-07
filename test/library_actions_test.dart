@@ -358,6 +358,7 @@ void main() {
       final renamed = await controller.saveOption(
         id: builtin.id,
         name: '黄焖鸡套餐',
+        category: builtin.category,
         periods: builtin.periods,
         confirmSameFood: true,
       );
@@ -492,7 +493,7 @@ void main() {
               await database.execute(
                 'CREATE TABLE history_items (operation_id TEXT NOT NULL REFERENCES history_records(operation_id), position INTEGER NOT NULL, option_id TEXT NOT NULL REFERENCES options(id), PRIMARY KEY (operation_id, position))',
               );
-              for (final option in seedOptions) {
+              for (final option in seedOptions.take(8)) {
                 await database.insert('options', {
                   'id': option.id,
                   'name': option.name,
@@ -537,10 +538,7 @@ void main() {
         expect(
           controller.options.every(
             (option) =>
-                option.isBuiltIn &&
-                option.isActive &&
-                !option.isDeleted &&
-                option.scenario == 'eat',
+                option.isBuiltIn && option.isActive && !option.isDeleted,
           ),
           isTrue,
         );
@@ -561,7 +559,7 @@ void main() {
           options: OpenDatabaseOptions(singleInstance: false),
         );
         try {
-          expect(await inspector.getVersion(), 3);
+          expect(await inspector.getVersion(), 4);
           expect(await inspector.rawQuery('PRAGMA foreign_key_check'), isEmpty);
         } finally {
           await inspector.close();

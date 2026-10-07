@@ -110,7 +110,7 @@ void main() {
 
   test('one explicit draw and confirmation survives reopening', () async {
     expect(controller.period, MealPeriod.lunch);
-    expect(controller.options.length, 8);
+    expect(controller.options.length, 70);
     expect(controller.history, isEmpty);
     expect(controller.error, isNull);
     draw();
@@ -259,6 +259,8 @@ void main() {
       expect(controller.startDraw(), isFalse);
       expect(controller.abandon(), isFalse);
       expect(controller.changePeriod(MealPeriod.dinner), isFalse);
+      expect(controller.changeScenario(MealScenario.cook), isFalse);
+      expect(controller.scenario, MealScenario.eat);
       expect(controller.result, same(selected));
       expect(controller.period, MealPeriod.lunch);
       release.complete();
@@ -286,36 +288,14 @@ void main() {
     'every eligible option is selectable from the complete period pool',
     () async {
       final accepted = <MealPeriod, List<String>>{
-        MealPeriod.breakfast: [
-          'buns',
-          'pancake',
-          'porridge',
-          'soy-milk',
-          'soy-beverage',
-        ],
-        MealPeriod.lunch: [
-          'rice',
-          'noodles',
-          'buns',
-          'pancake',
-          'burger',
-          'soy-milk',
-          'soy-beverage',
-        ],
-        MealPeriod.dinner: [
-          'rice',
-          'noodles',
-          'porridge',
-          'burger',
-          'soy-milk',
-          'soy-beverage',
-        ],
-        MealPeriod.lateNight: [
-          'noodles',
-          'porridge',
-          'soy-milk',
-          'soy-beverage',
-        ],
+        for (final period in MealPeriod.values)
+          period: seedOptions
+              .where(
+                (option) =>
+                    option.scenario == 'eat' && option.periods.contains(period),
+              )
+              .map((option) => option.id)
+              .toList(),
       };
       for (final entry in accepted.entries) {
         expect(controller.changePeriod(entry.key), isTrue);
