@@ -7,6 +7,8 @@ import '../data/meal_repository.dart';
 import '../domain/meal.dart';
 import '../domain/meal_preferences.dart';
 
+enum ReplacementChoice { redraw, exclude }
+
 class MealController extends ChangeNotifier {
   MealController({
     required MealRepository repository,
@@ -32,6 +34,7 @@ class MealController extends ChangeNotifier {
   List<FoodOption> _results = const [];
   int _cookingCount = 1;
   int? _selectedIndex;
+  int? _pendingReplacementIndex;
   ConfirmationOperation? _operation;
   bool _isDrawing = false;
   bool _isSaving = false;
@@ -66,6 +69,7 @@ class MealController extends ChangeNotifier {
   int get cookingCount => _cookingCount;
   int get requestedCount => _scenario == MealScenario.cook ? _cookingCount : 1;
   List<FoodOption> get results => _results;
+  int? get pendingReplacementIndex => _pendingReplacementIndex;
   int get availableCount => _remainingCandidates().length;
   bool get hasCandidateShortage =>
       !hasRound && availableCount > 0 && availableCount < requestedCount;
@@ -74,8 +78,13 @@ class MealController extends ChangeNotifier {
       !_dataUnavailable &&
       !_isDrawing &&
       _operation == null &&
-      _results.length < requestedCount &&
+      (_pendingReplacementIndex != null || _results.length < requestedCount) &&
       (hasRound ? availableCount > 0 : availableCount >= requestedCount);
+  bool get canConfirm =>
+      !isBusy &&
+      !_isDrawing &&
+      _pendingReplacementIndex == null &&
+      _results.isNotEmpty;
   MealPreferences get preferences => _preferences;
   Set<String> get sessionExclusions => Set.unmodifiable(_sessionExclusions);
   bool get isModeLocked => hasRound;
@@ -120,18 +129,69 @@ class MealController extends ChangeNotifier {
   }
 
   List<FoodOption> _remainingCandidates() {
+    if (_pendingReplacementIndex != null) return _roundCandidates!;
     final scope = _roundScope;
     if (scope == null) return _eligibleCandidates();
     final selectedIds = _results.map((option) => option.id).toSet();
     return List.unmodifiable(
-      scope.where((option) => !selectedIds.contains(option.id)),
+      scope.where(
+        (option) =>
+            !selectedIds.contains(option.id) &&
+            !_sessionExclusions.contains(option.id),
+      ),
     );
+  }
+
+  // Availability is checked when a choice is applied so shortage actions remain
+  // reachable and explain why the existing result cannot be replaced.
+  bool canReplace(int index) =>
+      !isBusy &&
+      !_dataUnavailable &&
+      !_isDrawing &&
+      _operation == null &&
+      _pendingReplacementIndex == null &&
+      index >= 0 &&
+      index < _results.length;
+
+  bool beginReplacement(int index, ReplacementChoice choice) {
+    if (!canReplace(index)) return false;
+    final outgoing = _results[index];
+    final otherIds = {
+      for (var slot = 0; slot < _results.length; slot++)
+        if (slot != index) _results[slot].id,
+    };
+    final pool = _roundScope!
+        .where(
+          (option) =>
+              !otherIds.contains(option.id) &&
+              !_sessionExclusions.contains(option.id),
+        )
+        .toList();
+    if (!pool.any((option) => option.id != outgoing.id)) {
+      _error = '没有其他符合条件的选项可以替换，请保留当前结果或重新调整条件。';
+      _notify();
+      return false;
+    }
+    if (choice == ReplacementChoice.exclude) {
+      _sessionExclusions.add(outgoing.id);
+      pool.removeWhere((option) => option.id == outgoing.id);
+    }
+    pool.shuffle(_random);
+    _roundCandidates = List.unmodifiable(pool);
+    _pendingReplacementIndex = index;
+    _chosen = null;
+    _result = null;
+    _selectedIndex = null;
+    _error = null;
+    _notify();
+    return true;
   }
 
   FoodOption? get result => _result;
   int? get selectedIndex => _selectedIndex;
   bool get isDrawing => _isDrawing;
   bool get isSaving => _isSaving;
+  bool get hasConfirmationAttempt => _operation != null;
   bool get hasRound => _roundScope != null;
   String? get error => _dataUnavailable ? '更新后的本地数据暂时无法读取，请重新打开应用。' : _error;
   List<HistoryEntry> get history => _history;
@@ -257,7 +317,8 @@ class MealController extends ChangeNotifier {
     if (isBusy ||
         _isDrawing ||
         _operation != null ||
-        _results.length >= requestedCount) {
+        (_pendingReplacementIndex == null &&
+            _results.length >= requestedCount)) {
       return false;
     }
     if (_dataUnavailable) return false;
@@ -288,12 +349,20 @@ class MealController extends ChangeNotifier {
     if (!_isDrawing) return;
     _isDrawing = false;
     _result = _chosen;
-    _results = List.unmodifiable([..._results, _chosen!]);
+    final replacementIndex = _pendingReplacementIndex;
+    if (replacementIndex == null) {
+      _results = List.unmodifiable([..._results, _chosen!]);
+    } else {
+      final updated = List<FoodOption>.of(_results);
+      updated[replacementIndex] = _chosen!;
+      _results = List.unmodifiable(updated);
+      _pendingReplacementIndex = null;
+    }
     _notify();
   }
 
   Future<bool> confirm() async {
-    if (isBusy || _isDrawing || _results.isEmpty) return false;
+    if (!canConfirm) return false;
     _operation ??= ConfirmationOperation(
       operationId: List.generate(
         16,
@@ -397,6 +466,7 @@ class MealController extends ChangeNotifier {
     _result = null;
     _results = const [];
     _selectedIndex = null;
+    _pendingReplacementIndex = null;
     _operation = null;
     _isDrawing = false;
   }
@@ -425,7 +495,7 @@ class MealController extends ChangeNotifier {
     }
   }
 
-  // Between-round session actions; replacement will add its own slot transition.
+  // Between-round session actions; in-round exclusions use beginReplacement.
   bool excludeForSession(String optionId) {
     if (isBusy ||
         hasRound ||

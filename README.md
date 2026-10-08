@@ -11,6 +11,7 @@ Android-first meal decisions. Draw What to eat (吃什么), What to cook (做什
 - [S04 acceptance criteria](https://github.com/xinlx227-ai/Whatever/issues/5)
 - [S05 acceptance criteria](https://github.com/xinlx227-ai/Whatever/issues/6)
 - [S06 acceptance criteria](https://github.com/xinlx227-ai/Whatever/issues/7)
+- [S07 acceptance criteria](https://github.com/xinlx227-ai/Whatever/issues/8)
 - [Domain language](GLOSSARY.md)
 - [Selected visual treatment](docs/design/warm-meal.md)
 - [Verification evidence and workstation notes](docs/verification/s01-android.md)
@@ -19,8 +20,9 @@ Android-first meal decisions. Draw What to eat (吃什么), What to cook (做什
 - [S04 scenarios, seed upgrades, and restaurant verification](docs/verification/s04-android.md)
 - [S05 categories, combined filters, and migration verification](docs/verification/s05-android.md)
 - [S06 cooking batches and atomic meal verification](docs/verification/s06-android.md)
+- [S07 wheel replacement and session-exclusion verification](docs/verification/s07-android.md)
 
-Categories can be created, renamed, and filtered together within each scenario. Custom-category deletion retains its options in the fallback category. Combined filters draw once per eligible option identity. Cooking shortages offer the available count or filter adjustment. Later slices retain card mode, replacements, and broader name recognition. The browser comparison under `prototype/visual-directions/` is historical design material; variant A is selected. Its adjustable preview controls are not application settings.
+Categories can be created, renamed, and filtered together within each scenario. Custom-category deletion retains its options in the fallback category. Combined filters draw once per eligible option identity. Cooking shortages offer the available count or filter adjustment. Any wheel result can be replaced in its original slot by redrawing or excluding it for the live session. Replacement checks for an alternative and waits for another explicit start. Later slices retain card mode and broader name recognition. The browser comparison under `prototype/visual-directions/` is historical design material; variant A is selected. Its adjustable preview controls are not application settings.
 
 ## Run and verify
 
@@ -36,6 +38,7 @@ flutter test integration_test/library_journey_test.dart -d emulator-5554
 flutter test integration_test/scenario_journey_test.dart -d emulator-5554
 flutter test integration_test/category_journey_test.dart -d emulator-5554
 flutter test integration_test/cooking_journey_test.dart -d emulator-5554
+flutter test integration_test/replacement_journey_test.dart -d emulator-5554
 flutter run -d emulator-5554
 ```
 
