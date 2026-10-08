@@ -1,6 +1,6 @@
 # Whatever — Warm meal
 
-Android-first meal decisions. Draw one What to eat (吃什么), What to cook (做什么), or Where to eat (去哪吃) option with a wheel and explicitly confirm it to local SQLite history. The independent libraries include 32 foods/drinks, 26 cooking options, and 12 restaurant brands, plus personal options and photos. Live sessions survive navigation and backgrounding, and start fresh after process termination.
+Android-first meal decisions. Draw What to eat (吃什么), What to cook (做什么), or Where to eat (去哪吃) options with a wheel and explicitly confirm to local SQLite history. Cooking supports 1–10 distinct dishes drawn one at a time and saved as one meal, including early confirmation. The independent libraries include 32 foods/drinks, 26 cooking options, and 12 restaurant brands, plus personal options and photos. Live sessions survive navigation and backgrounding, and start fresh after process termination.
 
 ## Scope
 
@@ -10,6 +10,7 @@ Android-first meal decisions. Draw one What to eat (吃什么), What to cook (�
 - [S03 acceptance criteria](https://github.com/xinlx227-ai/Whatever/issues/4)
 - [S04 acceptance criteria](https://github.com/xinlx227-ai/Whatever/issues/5)
 - [S05 acceptance criteria](https://github.com/xinlx227-ai/Whatever/issues/6)
+- [S06 acceptance criteria](https://github.com/xinlx227-ai/Whatever/issues/7)
 - [Domain language](GLOSSARY.md)
 - [Selected visual treatment](docs/design/warm-meal.md)
 - [Verification evidence and workstation notes](docs/verification/s01-android.md)
@@ -17,8 +18,9 @@ Android-first meal decisions. Draw one What to eat (吃什么), What to cook (�
 - [S03 library and image verification](docs/verification/s03-android.md)
 - [S04 scenarios, seed upgrades, and restaurant verification](docs/verification/s04-android.md)
 - [S05 categories, combined filters, and migration verification](docs/verification/s05-android.md)
+- [S06 cooking batches and atomic meal verification](docs/verification/s06-android.md)
 
-Categories can be created, renamed, and filtered together within each scenario. Custom-category deletion retains its options in the fallback category. Combined filters draw once per eligible option identity. Later slices retain card mode, multiple cooking dishes, replacements, and broader name recognition. The browser comparison under `prototype/visual-directions/` is historical design material; variant A is selected. Its adjustable preview controls are not application settings.
+Categories can be created, renamed, and filtered together within each scenario. Custom-category deletion retains its options in the fallback category. Combined filters draw once per eligible option identity. Cooking shortages offer the available count or filter adjustment. Later slices retain card mode, replacements, and broader name recognition. The browser comparison under `prototype/visual-directions/` is historical design material; variant A is selected. Its adjustable preview controls are not application settings.
 
 ## Run and verify
 
@@ -33,6 +35,7 @@ flutter test integration_test/android_journey_test.dart -d emulator-5554
 flutter test integration_test/library_journey_test.dart -d emulator-5554
 flutter test integration_test/scenario_journey_test.dart -d emulator-5554
 flutter test integration_test/category_journey_test.dart -d emulator-5554
+flutter test integration_test/cooking_journey_test.dart -d emulator-5554
 flutter run -d emulator-5554
 ```
 
@@ -55,7 +58,7 @@ The APK is written to `build/app/outputs/flutter-apk/app-release.apk` and suppor
 - `lib/domain/meal.dart`: accepted identities, meal periods, and confirmation data.
 - `lib/domain/meal_preferences.dart`: durable mode and yesterday-filter preferences; their future controls remain hidden.
 - `lib/application/meal_controller.dart`: eligible selection and temporary round state; animation cannot influence probability.
-- `lib/data/meal_repository.dart`: SQLite schema and atomic, idempotent confirmation. Fault seams simulate rollback after a header write and lost acknowledgement after commit.
+- `lib/data/meal_repository.dart`: SQLite schema and atomic, idempotent confirmation. Fault seams simulate rollback after a header or item write and lost acknowledgement after commit.
 - `lib/presentation/`: Chinese UI, responsive layout, animation, navigation, and feedback.
 - `test/`: real SQLite application journeys and widget interaction checks.
 - `integration_test/`: native Android draw-to-durable-history smoke journey.

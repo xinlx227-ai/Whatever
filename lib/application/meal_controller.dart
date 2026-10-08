@@ -29,6 +29,8 @@ class MealController extends ChangeNotifier {
   List<HistoryEntry> _history = const [];
   FoodOption? _chosen;
   FoodOption? _result;
+  List<FoodOption> _results = const [];
+  int _cookingCount = 1;
   int? _selectedIndex;
   ConfirmationOperation? _operation;
   bool _isDrawing = false;
@@ -38,6 +40,7 @@ class MealController extends ChangeNotifier {
   MealPreferences _preferences = const MealPreferences();
   final Set<String> _sessionExclusions = {};
   List<FoodOption>? _roundCandidates;
+  List<FoodOption>? _roundScope;
   bool _isUpdatingPreferences = false;
   int _pendingDataChanges = 0;
   Future<void> _dataChanges = Future.value();
@@ -60,6 +63,19 @@ class MealController extends ChangeNotifier {
       );
   Set<String> get selectedCategoryIds => Set.unmodifiable(_selectedCategoryIds);
   List<FoodOption> get candidates => _roundCandidates ?? _eligibleCandidates();
+  int get cookingCount => _cookingCount;
+  int get requestedCount => _scenario == MealScenario.cook ? _cookingCount : 1;
+  List<FoodOption> get results => _results;
+  int get availableCount => _remainingCandidates().length;
+  bool get hasCandidateShortage =>
+      !hasRound && availableCount > 0 && availableCount < requestedCount;
+  bool get canDraw =>
+      !isBusy &&
+      !_dataUnavailable &&
+      !_isDrawing &&
+      _operation == null &&
+      _results.length < requestedCount &&
+      (hasRound ? availableCount > 0 : availableCount >= requestedCount);
   MealPreferences get preferences => _preferences;
   Set<String> get sessionExclusions => Set.unmodifiable(_sessionExclusions);
   bool get isModeLocked => hasRound;
@@ -85,7 +101,7 @@ class MealController extends ChangeNotifier {
                 final time = entry.confirmedAt.toLocal();
                 return !time.isBefore(yesterday) && time.isBefore(today);
               })
-              .map((entry) => entry.option.id)
+              .expand((entry) => entry.options.map((option) => option.id))
               .toSet()
         : const <String>{};
     return List.unmodifiable(
@@ -103,11 +119,20 @@ class MealController extends ChangeNotifier {
     );
   }
 
+  List<FoodOption> _remainingCandidates() {
+    final scope = _roundScope;
+    if (scope == null) return _eligibleCandidates();
+    final selectedIds = _results.map((option) => option.id).toSet();
+    return List.unmodifiable(
+      scope.where((option) => !selectedIds.contains(option.id)),
+    );
+  }
+
   FoodOption? get result => _result;
   int? get selectedIndex => _selectedIndex;
   bool get isDrawing => _isDrawing;
   bool get isSaving => _isSaving;
-  bool get hasRound => _chosen != null;
+  bool get hasRound => _roundScope != null;
   String? get error => _dataUnavailable ? '更新后的本地数据暂时无法读取，请重新打开应用。' : _error;
   List<HistoryEntry> get history => _history;
 
@@ -229,18 +254,30 @@ class MealController extends ChangeNotifier {
   }
 
   bool startDraw() {
-    if (isBusy || hasRound) return false;
+    if (isBusy ||
+        _isDrawing ||
+        _operation != null ||
+        _results.length >= requestedCount) {
+      return false;
+    }
     if (_dataUnavailable) return false;
-    final pool = candidates;
+    final pool = _remainingCandidates();
     if (pool.isEmpty) {
       _error = '没有符合条件的选项，请调整条件或恢复本次排除。';
       _notify();
       return false;
     }
+    if (!hasRound && pool.length < requestedCount) {
+      _error = '当前只有 ${pool.length} 道符合条件的菜，请减少数量或调整条件。';
+      _notify();
+      return false;
+    }
+    // Freeze eligibility once for the whole batch, including the local date.
+    _roundScope ??= pool;
     _selectedIndex = _random.nextInt(pool.length);
+    // Keep this spin's ordered pool until the next draw so its index stays valid.
     _roundCandidates = pool;
     _chosen = pool[_selectedIndex!];
-    _result = null;
     _isDrawing = true;
     _error = null;
     _notify();
@@ -251,11 +288,12 @@ class MealController extends ChangeNotifier {
     if (!_isDrawing) return;
     _isDrawing = false;
     _result = _chosen;
+    _results = List.unmodifiable([..._results, _chosen!]);
     _notify();
   }
 
   Future<bool> confirm() async {
-    if (isBusy || _isDrawing || _result == null) return false;
+    if (isBusy || _isDrawing || _results.isEmpty) return false;
     _operation ??= ConfirmationOperation(
       operationId: List.generate(
         16,
@@ -263,7 +301,7 @@ class MealController extends ChangeNotifier {
       ).join(),
       confirmedAt: _clock(),
       period: _period,
-      option: _result!,
+      options: _results,
     );
     _isSaving = true;
     _confirmationFinished = Completer<void>();
@@ -295,6 +333,19 @@ class MealController extends ChangeNotifier {
     if (_period == period) return true;
     _clearRound();
     _period = period;
+    _error = null;
+    _notify();
+    return true;
+  }
+
+  // Presentation obtains restart consent before applying a changed count.
+  bool changeCookingCount(int count) {
+    if (isBusy || _scenario != MealScenario.cook || count < 1 || count > 10) {
+      return false;
+    }
+    if (_cookingCount == count) return true;
+    _clearRound();
+    _cookingCount = count;
     _error = null;
     _notify();
     return true;
@@ -341,8 +392,10 @@ class MealController extends ChangeNotifier {
 
   void _clearRound() {
     _roundCandidates = null;
+    _roundScope = null;
     _chosen = null;
     _result = null;
+    _results = const [];
     _selectedIndex = null;
     _operation = null;
     _isDrawing = false;

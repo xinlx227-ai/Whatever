@@ -6,7 +6,11 @@ import 'package:sqflite_common/sqlite_api.dart';
 import '../domain/meal.dart';
 import '../domain/meal_preferences.dart';
 
-enum ConfirmationPhase { afterHeaderWritten, beforeAcknowledgement }
+enum ConfirmationPhase {
+  afterHeaderWritten,
+  afterItemWritten,
+  beforeAcknowledgement,
+}
 
 typedef ConfirmationFault = FutureOr<void> Function(ConfirmationPhase phase);
 
@@ -701,24 +705,42 @@ class MealRepository {
       JOIN history_items i ON i.operation_id = r.operation_id
       ORDER BY r.confirmed_at DESC, r.rowid DESC, i.position ASC
     ''');
+    final grouped = <String, List<Map<String, Object?>>>{};
+    for (final row in rows) {
+      (grouped[row['operation_id']! as String] ??= []).add(row);
+    }
     return List.unmodifiable(
-      rows.map(
-        (row) => HistoryEntry(
-          operationId: row['operation_id']! as String,
+      grouped.entries.map((entry) {
+        final row = entry.value.first;
+        return HistoryEntry(
+          operationId: entry.key,
           confirmedAt: DateTime.fromMicrosecondsSinceEpoch(
             row['confirmed_at']! as int,
             isUtc: true,
           ),
           period: MealPeriod.values.byName(row['period']! as String),
-          option: optionsById[row['option_id']]!,
-        ),
-      ),
+          options: entry.value
+              .map((item) => optionsById[item['option_id']]!)
+              .toList(),
+        );
+      }),
     );
   }
 
   Future<void> confirm(ConfirmationOperation operation) async {
     if (operation.operationId.trim().isEmpty) {
       throw ArgumentError.value(operation.operationId, 'operationId');
+    }
+    final options = operation.options;
+    if (options.isEmpty || options.length > 10) {
+      throw ArgumentError.value(options.length, 'options', 'Expected 1–10.');
+    }
+    final scenario = options.first.scenario;
+    if (!MealScenario.values.any((value) => value.name == scenario) ||
+        options.any((option) => option.scenario != scenario) ||
+        (scenario != MealScenario.cook.name && options.length != 1) ||
+        options.map((option) => option.id).toSet().length != options.length) {
+      throw ArgumentError('Expected distinct options from one scenario.');
     }
     final inserted = await _database.transaction((transaction) async {
       final existing = await transaction.query(
@@ -737,29 +759,44 @@ class MealRepository {
         if (record['confirmed_at'] !=
                 operation.confirmedAt.microsecondsSinceEpoch ||
             record['period'] != operation.period.name ||
-            items.length != 1 ||
-            items.single['position'] != 0 ||
-            items.single['option_id'] != operation.option.id) {
+            items.length != options.length) {
           throw StateError('Confirmation operation payload does not match.');
+        }
+        for (var index = 0; index < options.length; index++) {
+          if (items[index]['position'] != index ||
+              items[index]['option_id'] != options[index].id) {
+            throw StateError('Confirmation operation payload does not match.');
+          }
+        }
+        // A committed retry acknowledges the original payload even when an
+        // option has since become ineligible. Its scenario must still match.
+        for (final option in options) {
+          final stored = await transaction.query(
+            'options',
+            columns: ['scenario'],
+            where: 'id = ?',
+            whereArgs: [option.id],
+          );
+          if (stored.isEmpty || stored.single['scenario'] != scenario) {
+            throw StateError('Confirmation option scenario does not match.');
+          }
         }
         return false;
       }
 
-      final eligible = await transaction.query(
-        'option_periods',
-        where: 'option_id = ? AND period = ?',
-        whereArgs: [operation.option.id, operation.period.name],
-      );
-      if (eligible.isEmpty) {
-        throw StateError('The option is not eligible for this meal period.');
-      }
-      final active = await transaction.query(
-        'options',
-        where: 'id = ? AND is_active = 1 AND is_deleted = 0',
-        whereArgs: [operation.option.id],
-      );
-      if (active.isEmpty) {
-        throw StateError('The option is no longer active.');
+      for (final option in options) {
+        final eligible = await transaction.rawQuery(
+          '''
+          SELECT o.id FROM options o
+          JOIN option_periods p ON p.option_id = o.id
+          WHERE o.id = ? AND o.scenario = ? AND o.is_active = 1
+            AND o.is_deleted = 0 AND p.period = ?
+        ''',
+          [option.id, scenario, operation.period.name],
+        );
+        if (eligible.isEmpty) {
+          throw StateError('The option is no longer eligible for this meal.');
+        }
       }
       await transaction.insert('history_records', {
         'operation_id': operation.operationId,
@@ -767,11 +804,14 @@ class MealRepository {
         'period': operation.period.name,
       });
       await _onConfirmationPhase?.call(ConfirmationPhase.afterHeaderWritten);
-      await transaction.insert('history_items', {
-        'operation_id': operation.operationId,
-        'position': 0,
-        'option_id': operation.option.id,
-      });
+      for (var index = 0; index < options.length; index++) {
+        await transaction.insert('history_items', {
+          'operation_id': operation.operationId,
+          'position': index,
+          'option_id': options[index].id,
+        });
+        await _onConfirmationPhase?.call(ConfirmationPhase.afterItemWritten);
+      }
       return true;
     });
     if (inserted) {

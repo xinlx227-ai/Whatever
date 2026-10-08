@@ -32,7 +32,7 @@ class ScenarioCopy {
       resultHint: '这一餐，做一道喜欢的',
       drawAction: '转一下，挑道菜',
       confirmAction: '就做这道',
-      confirmationNotice: '这道菜已记入足迹，准备下厨吧',
+      confirmationNotice: '这一餐已记入足迹，准备下厨吧',
     ),
     MealScenario.restaurant => const ScenarioCopy(
       heading: '今天，去哪儿吃？',

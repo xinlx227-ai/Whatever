@@ -70,6 +70,69 @@ class MealApp extends StatelessWidget {
   );
 }
 
+class _CookingCountDialog extends StatefulWidget {
+  const _CookingCountDialog({required this.initialCount});
+  final int initialCount;
+
+  @override
+  State<_CookingCountDialog> createState() => _CookingCountDialogState();
+}
+
+class _CookingCountDialogState extends State<_CookingCountDialog> {
+  late final TextEditingController input;
+  String? error;
+
+  @override
+  void initState() {
+    super.initState();
+    input = TextEditingController(text: '${widget.initialCount}');
+  }
+
+  @override
+  void dispose() {
+    input.dispose();
+    super.dispose();
+  }
+
+  void submit() {
+    final count = int.tryParse(input.text.trim());
+    if (count == null || count < 1 || count > 10) {
+      setState(() => error = '请输入 1 到 10 之间的整数');
+      return;
+    }
+    Navigator.pop(context, count);
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('这一餐做几道？'),
+    content: TextField(
+      key: const Key('custom-cooking-count-input'),
+      controller: input,
+      autofocus: true,
+      keyboardType: TextInputType.number,
+      textInputAction: TextInputAction.done,
+      onSubmitted: (_) => submit(),
+      decoration: InputDecoration(
+        labelText: '菜数',
+        helperText: '可以选择 1–10 道菜',
+        errorText: error,
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('取消'),
+      ),
+      TextButton(
+        key: const Key('apply-custom-cooking-count'),
+        onPressed: submit,
+        child: const Text('确定'),
+      ),
+    ],
+  );
+}
+
 class _MealHome extends StatefulWidget {
   const _MealHome({
     required this.controller,
@@ -90,10 +153,16 @@ class _MealHomeState extends State<_MealHome>
   int tab = 1;
   MealScenario libraryScenario = MealScenario.eat;
   final completionKey = GlobalKey();
+  final resultsKey = GlobalKey();
   double fromAngle = 0, toAngle = 0;
   bool asking = false;
   MealController get model => widget.controller;
   ScenarioCopy get scenarioCopy => ScenarioCopy.forScenario(model.scenario);
+  bool get pinCookingActions =>
+      tab == 1 &&
+      model.scenario == MealScenario.cook &&
+      MediaQuery.sizeOf(context).height >= 700 &&
+      MediaQuery.textScalerOf(context).scale(14) <= 18;
 
   @override
   void initState() {
@@ -189,7 +258,34 @@ class _MealHomeState extends State<_MealHome>
   }
 
   Future<void> draw() async {
-    if (model.hasRound) return;
+    if (model.isBusy || model.isDrawing || asking) return;
+    if (model.hasCandidateShortage) {
+      final available = model.availableCount;
+      final useAvailable = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('这次的菜还不够'),
+          content: Text('当前条件下只有 $available 道菜，可以改为抽 $available 道，或调整筛选条件。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('调整筛选条件'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text('改为 $available 道'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || model.isBusy) return;
+      if (useAvailable == true) {
+        model.changeCookingCount(available);
+      } else if (useAvailable == false) {
+        await selectCategories();
+      }
+      return;
+    }
     model.startDraw();
     if (!model.isDrawing) return;
     final reduced = MediaQuery.disableAnimationsOf(context);
@@ -220,7 +316,9 @@ class _MealHomeState extends State<_MealHome>
   void showCompletion() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || tab != 1 || model.result == null) return;
-      final target = completionKey.currentContext;
+      final target = pinCookingActions
+          ? resultsKey.currentContext
+          : completionKey.currentContext;
       if (target == null) return;
       Scrollable.ensureVisible(
         target,
@@ -286,6 +384,27 @@ class _MealHomeState extends State<_MealHome>
     if (!mounted || model.isBusy) return;
     resetWheel();
     model.changeScenario(scenario);
+  }
+
+  Future<void> selectCookingCount(int count) async {
+    if (count == model.cookingCount || model.isBusy || asking) return;
+    if (model.hasRound &&
+        !await ask('换个菜数？', '当前还未确认的菜会清空，按新的菜数重新开始。', '更改并重新开始')) {
+      return;
+    }
+    if (!mounted || model.isBusy) return;
+    resetWheel();
+    model.changeCookingCount(count);
+  }
+
+  Future<void> customCookingCount() async {
+    if (model.isBusy || asking) return;
+    final count = await showDialog<int>(
+      context: context,
+      builder: (context) =>
+          _CookingCountDialog(initialCount: model.cookingCount),
+    );
+    if (count != null && mounted) await selectCookingCount(count);
   }
 
   Future<void> confirm() async {
@@ -411,23 +530,40 @@ class _MealHomeState extends State<_MealHome>
             ),
           ),
         ),
-        bottomNavigationBar: NavigationBar(
-          backgroundColor: paper,
-          indicatorColor: soft,
-          selectedIndex: tab,
-          onDestinationSelected: selectTab,
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.menu_book_outlined),
-              label: '选项库',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.explore_outlined),
-              label: '决定',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.event_note_outlined),
-              label: '足迹',
+        bottomNavigationBar: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (pinCookingActions)
+              SafeArea(
+                top: false,
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: completion(),
+                  ),
+                ),
+              ),
+            NavigationBar(
+              backgroundColor: paper,
+              indicatorColor: soft,
+              selectedIndex: tab,
+              onDestinationSelected: selectTab,
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.menu_book_outlined),
+                  label: '选项库',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.explore_outlined),
+                  label: '决定',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.event_note_outlined),
+                  label: '足迹',
+                ),
+              ],
             ),
           ],
         ),
@@ -436,17 +572,19 @@ class _MealHomeState extends State<_MealHome>
   );
 
   List<Widget> decide() => [
-    const SizedBox(height: 24),
-    const Text(
-      '好好吃饭 · 好好生活',
-      style: TextStyle(
-        color: accent,
-        fontSize: 12,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 2,
+    SizedBox(height: model.scenario == MealScenario.cook ? 12 : 24),
+    if (model.scenario != MealScenario.cook) ...[
+      const Text(
+        '好好吃饭 · 好好生活',
+        style: TextStyle(
+          color: accent,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 2,
+        ),
       ),
-    ),
-    const SizedBox(height: 8),
+      const SizedBox(height: 8),
+    ],
     Text(
       scenarioCopy.heading,
       style: const TextStyle(
@@ -455,11 +593,13 @@ class _MealHomeState extends State<_MealHome>
         height: 1.3,
       ),
     ),
-    const SizedBox(height: 8),
-    const Text(
-      '把纠结留给转盘，把期待留给下一口。',
-      style: TextStyle(color: muted, fontSize: 13),
-    ),
+    if (model.scenario != MealScenario.cook) ...[
+      const SizedBox(height: 8),
+      const Text(
+        '把纠结留给转盘，把期待留给下一口。',
+        style: TextStyle(color: muted, fontSize: 13),
+      ),
+    ],
     const SizedBox(height: 12),
     ScenarioSelector(
       page: 'decide',
@@ -510,11 +650,48 @@ class _MealHomeState extends State<_MealHome>
           ),
         ),
         Text(
-          '${model.candidates.length} 个候选',
+          '${model.availableCount} 个候选',
           style: const TextStyle(color: muted, fontSize: 12),
         ),
       ],
     ),
+    if (model.scenario == MealScenario.cook) ...[
+      const SizedBox(height: 8),
+      const Text('这一餐，做几道？', style: TextStyle(fontWeight: FontWeight.w700)),
+      Wrap(
+        key: const Key('cooking-count-controls'),
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          for (final count in [1, 2, 3])
+            ChoiceChip(
+              key: ValueKey('cooking-count-$count'),
+              label: Text('$count 道'),
+              selected: model.cookingCount == count,
+              onSelected: model.isBusy
+                  ? null
+                  : (_) => selectCookingCount(count),
+            ),
+          ChoiceChip(
+            key: const Key('cooking-count-custom'),
+            label: Text(
+              model.cookingCount > 3 ? '${model.cookingCount} 道 · 自定义' : '自定义',
+            ),
+            selected: model.cookingCount > 3,
+            onSelected: model.isBusy ? null : (_) => customCookingCount(),
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      Semantics(
+        liveRegion: true,
+        child: Text(
+          '已选 ${model.results.length} / ${model.requestedCount} 道 · 每次转一道',
+          key: const Key('cooking-progress'),
+          style: const TextStyle(color: muted),
+        ),
+      ),
+    ],
     Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -538,10 +715,46 @@ class _MealHomeState extends State<_MealHome>
       ),
     ),
     Semantics(
+      key: resultsKey,
       liveRegion: true,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 16),
-        child: model.result == null
+        child: model.scenario == MealScenario.cook && model.results.isNotEmpty
+            ? Column(
+                children: [
+                  for (var index = 0; index < model.results.length; index++)
+                    Padding(
+                      key: ValueKey('cooking-result-$index'),
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        children: [
+                          Text(
+                            '${index + 1}',
+                            style: const TextStyle(color: muted),
+                          ),
+                          const SizedBox(width: 12),
+                          OptionArt(option: model.results[index], size: 48),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              model.results[index].name,
+                              key: index == model.results.length - 1
+                                  ? const Key('draw-result')
+                                  : null,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (model.isDrawing)
+                    const Text('下一道正在挑选…', style: TextStyle(color: muted)),
+                ],
+              )
+            : model.result == null
             ? Center(
                 child: Text(
                   model.isDrawing ? '让好胃口，再转一会儿…' : '不必想好答案，转一下就知道。',
@@ -618,6 +831,24 @@ class _MealHomeState extends State<_MealHome>
         ],
       ),
     ],
+    if (!pinCookingActions) ...completion(),
+  ];
+
+  List<Widget> completion() => [
+    if (model.scenario == MealScenario.cook &&
+        model.results.isNotEmpty &&
+        model.results.length < model.requestedCount)
+      Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: OutlinedButton(
+          key: const Key('draw-next-dish'),
+          onPressed: model.canDraw ? draw : null,
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 48),
+          ),
+          child: Text(model.isDrawing ? '正在挑选下一道…' : '再转一道'),
+        ),
+      ),
     FilledButton(
       key: const Key('primary-action'),
       onPressed: model.isDrawing || model.isBusy
@@ -633,6 +864,8 @@ class _MealHomeState extends State<_MealHome>
             : model.result != null
             ? model.error != null
                   ? '重试保存'
+                  : model.scenario == MealScenario.cook
+                  ? '就做这 ${model.results.length} 道菜'
                   : scenarioCopy.confirmAction
             : scenarioCopy.drawAction,
       ),
@@ -730,7 +963,7 @@ class _MealHomeState extends State<_MealHome>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      entry.option.name,
+                      entry.options.map((option) => option.name).join('、'),
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,

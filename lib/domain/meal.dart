@@ -844,29 +844,43 @@ const seedOptions = <FoodOption>[
 ];
 
 class ConfirmationOperation {
-  const ConfirmationOperation({
+  ConfirmationOperation({
     required this.operationId,
     required this.confirmedAt,
     required this.period,
-    required this.option,
-  });
+    FoodOption? option,
+    List<FoodOption>? options,
+  }) : options = _orderedOptions(option, options);
 
   final String operationId;
   final DateTime confirmedAt;
   final MealPeriod period;
-  final FoodOption option;
+  final List<FoodOption> options;
+  FoodOption get option => options.first;
 }
 
 class HistoryEntry {
-  const HistoryEntry({
+  HistoryEntry({
     required this.operationId,
     required this.confirmedAt,
     required this.period,
-    required this.option,
-  });
+    FoodOption? option,
+    List<FoodOption>? options,
+  }) : options = _orderedOptions(option, options);
 
   final String operationId;
   final DateTime confirmedAt;
   final MealPeriod period;
-  final FoodOption option;
+  final List<FoodOption> options;
+  FoodOption get option => options.first;
+}
+
+List<FoodOption> _orderedOptions(
+  FoodOption? option,
+  List<FoodOption>? options,
+) {
+  if ((option == null) == (options == null)) {
+    throw ArgumentError('Provide either option or options.');
+  }
+  return List.unmodifiable(options ?? [option!]);
 }

@@ -404,7 +404,7 @@ void main() {
         expect(find.byKey(const Key('draw-result')), findsOneWidget);
         expect(controller.result!.scenario, value.name);
         expect(
-          find.text(value == MealScenario.cook ? '就做这道' : '就去这家'),
+          find.text(value == MealScenario.cook ? '就做这 1 道菜' : '就去这家'),
           findsOneWidget,
         );
         final chosen = controller.result!;
