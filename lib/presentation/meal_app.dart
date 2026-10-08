@@ -13,6 +13,7 @@ import 'option_library.dart';
 import 'option_editor.dart';
 import 'scenario_selector.dart';
 import 'scenario_copy.dart';
+import 'category_filter_sheet.dart';
 
 class MealApp extends StatelessWidget {
   const MealApp({
@@ -299,6 +300,37 @@ class _MealHomeState extends State<_MealHome>
     }
   }
 
+  Future<void> selectCategories() async {
+    if (model.isBusy || asking) return;
+    final selection = await showModalBottomSheet<CategoryFilterSelection>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * .85,
+        ),
+        child: CategoryFilterSheet(
+          categories: model.categoriesFor(model.scenario),
+          selectedIds: model.selectedCategoryIds,
+          period: model.period,
+        ),
+      ),
+    );
+    if (selection == null || !mounted || model.isBusy) return;
+    final unchanged =
+        selection.period == model.period &&
+        selection.ids.length == model.selectedCategoryIds.length &&
+        selection.ids.containsAll(model.selectedCategoryIds);
+    if (unchanged) return;
+    if (model.hasRound &&
+        !await ask('更换筛选条件？', '当前还未确认的选择会清空，按新条件重新开始。', '应用并重新开始')) {
+      return;
+    }
+    if (!mounted || model.isBusy) return;
+    model.changeCategoryFilters(selection.ids, period: selection.period);
+  }
+
   Future<void> back() async {
     if (tab != 1) {
       selectTab(1);
@@ -463,9 +495,18 @@ class _MealHomeState extends State<_MealHome>
     Row(
       children: [
         Expanded(
-          child: Text(
-            '为${model.period.label}准备的灵感',
-            style: const TextStyle(color: muted, fontSize: 12),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: const Key('category-filter-button'),
+              onPressed: model.isBusy ? null : selectCategories,
+              icon: const Icon(Icons.filter_list),
+              label: Text(
+                model.selectedCategoryIds.isEmpty
+                    ? '全部分类'
+                    : '已选 ${model.selectedCategoryIds.length} 个分类',
+              ),
+            ),
           ),
         ),
         Text(
@@ -481,8 +522,8 @@ class _MealHomeState extends State<_MealHome>
               (MediaQuery.sizeOf(context).height -
                       MediaQuery.paddingOf(context).vertical -
                       // Reserve both control rows, confirmation and navigation.
-                      570)
-                  .clamp(220.0, 330.0),
+                      604)
+                  .clamp(186.0, 330.0),
         ),
         child: AnimatedBuilder(
           animation: curve,
@@ -555,6 +596,28 @@ class _MealHomeState extends State<_MealHome>
           child: Text(model.error!, style: const TextStyle(color: accent)),
         ),
       ),
+    if (model.candidates.isEmpty && !model.hasRound) ...[
+      const Text('没有符合条件的选项', style: TextStyle(fontWeight: FontWeight.w700)),
+      const SizedBox(height: 4),
+      const Text('试试其他分类或餐段，也可以恢复本次排除的选项。已停用的选项仍会保持停用。'),
+      Wrap(
+        spacing: 8,
+        children: [
+          TextButton(
+            key: const Key('adjust-empty-conditions'),
+            onPressed: model.isBusy ? null : selectCategories,
+            child: const Text('调整条件'),
+          ),
+          TextButton(
+            key: const Key('restore-session-exclusions'),
+            onPressed: model.isBusy || model.sessionExclusions.isEmpty
+                ? null
+                : model.restoreSessionExclusions,
+            child: const Text('恢复本次排除'),
+          ),
+        ],
+      ),
+    ],
     FilledButton(
       key: const Key('primary-action'),
       onPressed: model.isDrawing || model.isBusy

@@ -24,6 +24,8 @@ class MealController extends ChangeNotifier {
   MealPeriod _period;
   MealScenario _scenario = MealScenario.eat;
   List<FoodOption> _options = const [];
+  List<MealCategory> _categories = const [];
+  Set<String> _selectedCategoryIds = {};
   List<HistoryEntry> _history = const [];
   FoodOption? _chosen;
   FoodOption? _result;
@@ -49,6 +51,14 @@ class MealController extends ChangeNotifier {
   MealScenario get scenario => _scenario;
   MealPeriod get currentLocalPeriod => MealPeriod.at(_clock().toLocal());
   List<FoodOption> get options => _options;
+  List<MealCategory> categoriesFor(MealScenario scenario) => List.unmodifiable(
+    _categories.where((category) => category.scenario == scenario),
+  );
+  MealCategory fallbackCategory(MealScenario scenario) =>
+      _categories.firstWhere(
+        (category) => category.scenario == scenario && category.isFallback,
+      );
+  Set<String> get selectedCategoryIds => Set.unmodifiable(_selectedCategoryIds);
   List<FoodOption> get candidates => _roundCandidates ?? _eligibleCandidates();
   MealPreferences get preferences => _preferences;
   Set<String> get sessionExclusions => Set.unmodifiable(_sessionExclusions);
@@ -62,6 +72,10 @@ class MealController extends ChangeNotifier {
 
   List<FoodOption> _eligibleCandidates() {
     if (_dataUnavailable) return const [];
+    final selectedNames = _categories
+        .where((category) => _selectedCategoryIds.contains(category.id))
+        .map((category) => category.name)
+        .toSet();
     final now = _clock().toLocal();
     final today = DateTime(now.year, now.month, now.day);
     final yesterday = DateTime(now.year, now.month, now.day - 1);
@@ -81,6 +95,8 @@ class MealController extends ChangeNotifier {
             option.isActive &&
             !option.isDeleted &&
             option.periods.contains(_period) &&
+            (_selectedCategoryIds.isEmpty ||
+                option.categories.any(selectedNames.contains)) &&
             !_sessionExclusions.contains(option.id) &&
             !yesterdayIds.contains(option.id),
       ),
@@ -123,7 +139,7 @@ class MealController extends ChangeNotifier {
     String? id,
     required String name,
     required Set<MealPeriod> periods,
-    String category = '未分类',
+    String? category,
     String scenario = 'eat',
     String? imagePath,
     String? address,
@@ -154,6 +170,17 @@ class MealController extends ChangeNotifier {
 
   Future<OptionMutationResult> deleteOption(String id) =>
       _mutateLibrary(() => _repository.deleteOption(id));
+
+  Future<OptionMutationResult> saveCategory({
+    String? id,
+    required String name,
+    MealScenario scenario = MealScenario.eat,
+  }) => _mutateLibrary(
+    () => _repository.saveCategory(id: id, name: name, scenario: scenario),
+  );
+
+  Future<OptionMutationResult> deleteCategory(String id) =>
+      _mutateLibrary(() => _repository.deleteCategory(id));
 
   Future<OptionMutationResult> _mutateLibrary(
     Future<OptionMutationResult> Function() mutation,
@@ -188,6 +215,7 @@ class MealController extends ChangeNotifier {
   Future<void> initialize() async {
     try {
       _options = await _repository.options();
+      _categories = await _repository.categories();
       _history = await _repository.history();
       _preferences = await _repository.preferences();
       _dataUnavailable = false;
@@ -205,7 +233,7 @@ class MealController extends ChangeNotifier {
     if (_dataUnavailable) return false;
     final pool = candidates;
     if (pool.isEmpty) {
-      _error = '这个时段暂无可选选项，请换个时段或到选项库添加。';
+      _error = '没有符合条件的选项，请调整条件或恢复本次排除。';
       _notify();
       return false;
     }
@@ -278,6 +306,7 @@ class MealController extends ChangeNotifier {
     if (_scenario == scenario) return true;
     _clearRound();
     _scenario = scenario;
+    _selectedCategoryIds = {};
     _error = null;
     _notify();
     return true;
@@ -286,6 +315,25 @@ class MealController extends ChangeNotifier {
   bool abandon() {
     if (isBusy) return false;
     _clearRound();
+    _error = null;
+    _notify();
+    return true;
+  }
+
+  // Presentation applies the staged filters only after restart consent.
+  bool changeCategoryFilters(Set<String> ids, {MealPeriod? period}) {
+    if (isBusy) return false;
+    final validIds = categoriesFor(
+      _scenario,
+    ).map((category) => category.id).toSet();
+    if (!validIds.containsAll(ids)) return false;
+    final nextPeriod = period ?? _period;
+    if (setEquals(ids, _selectedCategoryIds) && nextPeriod == _period) {
+      return true;
+    }
+    _clearRound();
+    _selectedCategoryIds = Set.of(ids);
+    _period = nextPeriod;
     _error = null;
     _notify();
     return true;
@@ -339,6 +387,7 @@ class MealController extends ChangeNotifier {
   bool restoreSessionExclusions() {
     if (isBusy || hasRound) return false;
     _sessionExclusions.clear();
+    _error = null;
     _notify();
     return true;
   }
@@ -356,8 +405,26 @@ class MealController extends ChangeNotifier {
         _restartNotice = '选项或足迹已更新，这一轮已重置，请重新选择。';
       }
       try {
-        _options = await _repository.options();
-        _history = await _repository.history();
+        final options = await _repository.options();
+        final categories = await _repository.categories();
+        final history = await _repository.history();
+        final categoryIds = categories.map((category) => category.id).toSet();
+        // A deleted selected category follows its retained options to fallback.
+        final lostSelection = !_selectedCategoryIds.every(categoryIds.contains);
+        _selectedCategoryIds = _selectedCategoryIds.intersection(categoryIds);
+        if (lostSelection) {
+          _selectedCategoryIds.add(
+            categories
+                .firstWhere(
+                  (category) =>
+                      category.scenario == _scenario && category.isFallback,
+                )
+                .id,
+          );
+        }
+        _options = options;
+        _categories = categories;
+        _history = history;
         _dataUnavailable = false;
         _error = null;
       } catch (_) {

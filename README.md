@@ -9,14 +9,16 @@ Android-first meal decisions. Draw one What to eat (吃什么), What to cook (�
 - [S02 acceptance criteria](https://github.com/xinlx227-ai/Whatever/issues/3)
 - [S03 acceptance criteria](https://github.com/xinlx227-ai/Whatever/issues/4)
 - [S04 acceptance criteria](https://github.com/xinlx227-ai/Whatever/issues/5)
+- [S05 acceptance criteria](https://github.com/xinlx227-ai/Whatever/issues/6)
 - [Domain language](GLOSSARY.md)
 - [Selected visual treatment](docs/design/warm-meal.md)
 - [Verification evidence and workstation notes](docs/verification/s01-android.md)
 - [S02 lifecycle evidence and integration contracts](docs/verification/s02-android.md)
 - [S03 library and image verification](docs/verification/s03-android.md)
 - [S04 scenarios, seed upgrades, and restaurant verification](docs/verification/s04-android.md)
+- [S05 categories, combined filters, and migration verification](docs/verification/s05-android.md)
 
-Later slices retain card mode, multiple cooking dishes, replacements, category filtering/management, and broader name recognition. The browser comparison under `prototype/visual-directions/` is historical design material; variant A is selected. Its adjustable preview controls are not application settings.
+Categories can be created, renamed, and filtered together within each scenario. Custom-category deletion retains its options in the fallback category. Combined filters draw once per eligible option identity. Later slices retain card mode, multiple cooking dishes, replacements, and broader name recognition. The browser comparison under `prototype/visual-directions/` is historical design material; variant A is selected. Its adjustable preview controls are not application settings.
 
 ## Run and verify
 
@@ -30,6 +32,7 @@ flutter test
 flutter test integration_test/android_journey_test.dart -d emulator-5554
 flutter test integration_test/library_journey_test.dart -d emulator-5554
 flutter test integration_test/scenario_journey_test.dart -d emulator-5554
+flutter test integration_test/category_journey_test.dart -d emulator-5554
 flutter run -d emulator-5554
 ```
 
@@ -57,4 +60,4 @@ The APK is written to `build/app/outputs/flutter-apk/app-release.apk` and suppor
 - `test/`: real SQLite application journeys and widget interaction checks.
 - `integration_test/`: native Android draw-to-durable-history smoke journey.
 
-Unconfirmed rounds and session exclusions remain in memory. Option library and Decide remember independent scenario selections during the session; Decide shares one selected meal period across scenarios. Root Back moves the Android task home; removing the task destroys its engine. SQLite schema v4 expands seed content, stores multiple built-in category memberships and restaurant address/notes, and preserves existing identities, display edits, images, activation, preferences, and history. Built-in food/dish categories and periods remain system-maintained; restaurant periods are user-editable applicability settings, not opening hours. Library mutations serialize with confirmation and invalidate unfinished rounds only after actual durable changes. Confirmation fixes an operation ID and payload before writing; retries reuse them, preventing duplicate records after lost acknowledgements. The database stores UTC instants and the UI groups records by local calendar date.
+Unconfirmed rounds and session exclusions remain in memory. Option library and Decide remember independent scenario selections during the session; Decide shares one selected meal period across scenarios. Root Back moves the Android task home; removing the task destroys its engine. SQLite schema v5 adds a persisted category registry and atomic category rename/deletion on top of the v4 seed content, built-in memberships, and restaurant fields. Category changes preserve option identities, display edits, images, activation, preferences, and history. Built-in food/dish categories and periods remain system-maintained; restaurant periods are user-editable applicability settings, not opening hours. Library mutations serialize with confirmation and invalidate unfinished rounds only after actual durable changes. Confirmation fixes an operation ID and payload before writing; retries reuse them, preventing duplicate records after lost acknowledgements. The database stores UTC instants and the UI groups records by local calendar date.

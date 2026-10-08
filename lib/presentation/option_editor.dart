@@ -36,7 +36,8 @@ class _OptionEditorState extends State<OptionEditor> {
   late final TextEditingController address;
   late final TextEditingController notes;
   late Set<MealPeriod> periods;
-  late String category;
+  late String categoryId;
+  late final String initialCategoryId;
   String? selectedImage;
   String? ownedImage;
   final Set<String> imageCleanupCandidates = {};
@@ -50,12 +51,25 @@ class _OptionEditorState extends State<OptionEditor> {
       ? widget.scenario
       : MealScenario.fromKey(original!.scenario);
   bool get isRestaurant => scenario == MealScenario.restaurant;
+  List<MealCategory> get categories =>
+      widget.controller.categoriesFor(scenario);
+  MealCategory get selectedCategory => categories.firstWhere(
+    (value) => value.id == categoryId,
+    orElse: () => widget.controller.fallbackCategory(scenario),
+  );
+  String get category => selectedCategory.name;
+  FoodOption? get currentOption => original == null
+      ? null
+      : widget.controller.options.firstWhere(
+          (value) => value.id == original!.id,
+          orElse: () => original!,
+        );
   bool get dirty =>
       name.text != (original?.name ?? '') ||
       address.text != (original?.address ?? '') ||
       notes.text != (original?.notes ?? '') ||
       selectedImage != null ||
-      category != (original?.category ?? '未分类') ||
+      categoryId != initialCategoryId ||
       !setEqualsPeriods(periods, initialPeriods);
   late final Set<MealPeriod> initialPeriods;
 
@@ -74,11 +88,18 @@ class _OptionEditorState extends State<OptionEditor> {
       initialPeriods.add(widget.controller.currentLocalPeriod);
     }
     periods = {...initialPeriods};
-    category = original?.category ?? '未分类';
+    categoryId = categories
+        .firstWhere(
+          (value) => value.name == original?.category,
+          orElse: () => widget.controller.fallbackCategory(scenario),
+        )
+        .id;
+    initialCategoryId = categoryId;
     selectedImage = widget.initialImagePath;
     name.addListener(refresh);
     address.addListener(refresh);
     notes.addListener(refresh);
+    widget.controller.addListener(refresh);
   }
 
   void refresh() {
@@ -87,6 +108,7 @@ class _OptionEditorState extends State<OptionEditor> {
 
   @override
   void dispose() {
+    widget.controller.removeListener(refresh);
     unawaited(
       images.discardUnreferenced(
         imageCleanupCandidates,
@@ -450,29 +472,29 @@ class _OptionEditorState extends State<OptionEditor> {
                       const SizedBox(height: 24),
                       DropdownButtonFormField<String>(
                         key: const Key('option-category'),
-                        initialValue: category,
+                        initialValue: selectedCategory.id,
                         isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: '分类',
                           border: OutlineInputBorder(),
                         ),
-                        items: {category, ...scenarioCategories[scenario]!}
+                        items: categories
                             .map(
                               (value) => DropdownMenuItem(
-                                value: value,
-                                child: Text(value),
+                                value: value.id,
+                                child: Text(value.name),
                               ),
                             )
                             .toList(),
                         onChanged: busy || locked
                             ? null
-                            : (value) => setState(() => category = value!),
+                            : (value) => setState(() => categoryId = value!),
                       ),
-                      if (locked && original!.categories.length > 1)
+                      if (locked && currentOption!.categories.length > 1)
                         Padding(
                           padding: const EdgeInsets.only(top: 12),
                           child: Text(
-                            '所属分类：${original!.categories.join(' · ')}',
+                            '所属分类：${currentOption!.categories.join(' · ')}',
                             key: const Key('option-category-memberships'),
                             style: const TextStyle(height: 1.5),
                           ),

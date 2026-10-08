@@ -25,7 +25,7 @@ class MealRepository {
     final database = await factory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-        version: 4,
+        version: 5,
         onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
         onCreate: (database, version) async {
           await database.execute('''
@@ -61,6 +61,7 @@ class MealRepository {
           await _createPreferences(database);
           await _addLibraryMetadata(database);
           await _addScenarioMetadata(database);
+          await _addCategoryRegistry(database);
         },
         onUpgrade: (database, oldVersion, newVersion) async {
           if (oldVersion < 2) {
@@ -72,10 +73,63 @@ class MealRepository {
           if (oldVersion < 4) {
             await _addScenarioMetadata(database);
           }
+          if (oldVersion < 5) {
+            await _addCategoryRegistry(database);
+          }
         },
       ),
     );
     return MealRepository._(database, onConfirmationPhase);
+  }
+
+  static Future<void> _addCategoryRegistry(DatabaseExecutor database) async {
+    await database.execute('''
+      CREATE TABLE categories (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        scenario TEXT NOT NULL CHECK (scenario IN ('eat', 'cook', 'restaurant')),
+        is_builtin INTEGER NOT NULL CHECK (is_builtin IN (0, 1)),
+        is_fallback INTEGER NOT NULL CHECK (is_fallback IN (0, 1)),
+        CHECK (is_fallback = 0 OR is_builtin = 1),
+        UNIQUE (scenario, name)
+      )
+    ''');
+    await database.execute('''
+      CREATE UNIQUE INDEX scenario_fallback
+      ON categories (scenario) WHERE is_fallback = 1
+    ''');
+    for (final scenario in MealScenario.values) {
+      final names = scenarioCategories[scenario]!;
+      for (var index = 0; index < names.length; index++) {
+        final name = names[index];
+        final fallback = name == '未分类';
+        await database.insert('categories', {
+          'id':
+              'builtin-category-${scenario.name}-${fallback ? 'fallback' : index}',
+          'name': name,
+          'scenario': scenario.name,
+          'is_builtin': 1,
+          'is_fallback': fallback ? 1 : 0,
+        });
+      }
+    }
+    // Keep every legacy label, including memberships retained for history.
+    final labels = await database.rawQuery('''
+      SELECT scenario, category FROM options
+      UNION
+      SELECT o.scenario, c.category FROM option_categories c
+      JOIN options o ON o.id = c.option_id
+    ''');
+    for (var index = 0; index < labels.length; index++) {
+      final row = labels[index];
+      await database.insert('categories', {
+        'id': 'legacy-category-$index',
+        'name': row['category'],
+        'scenario': row['scenario'],
+        'is_builtin': 0,
+        'is_fallback': 0,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
   }
 
   static Future<void> _addScenarioMetadata(DatabaseExecutor database) async {
@@ -206,6 +260,150 @@ class MealRepository {
 
   Future<List<FoodOption>> options() => _options(_database);
 
+  Future<List<MealCategory>> categories() => _categories(_database);
+
+  Future<List<MealCategory>> _categories(DatabaseExecutor executor) async {
+    final rows = await executor.query('categories', orderBy: 'rowid');
+    return List.unmodifiable(
+      rows.map(
+        (row) => MealCategory(
+          id: row['id']! as String,
+          name: row['name']! as String,
+          scenario: MealScenario.values.byName(row['scenario']! as String),
+          isBuiltIn: row['is_builtin'] == 1,
+          isFallback: row['is_fallback'] == 1,
+        ),
+      ),
+    );
+  }
+
+  Future<OptionMutationResult> saveCategory({
+    String? id,
+    required String name,
+    MealScenario scenario = MealScenario.eat,
+  }) => _database.transaction((transaction) async {
+    final displayName = name.trim();
+    final normalized = normalizedOptionName(displayName);
+    if (normalized.isEmpty || normalized == normalizedOptionName('全部')) {
+      return const OptionMutationResult(
+        OptionMutationStatus.invalid,
+        message: '请填写分类名称，全部仅用于筛选。',
+      );
+    }
+    final registered = await _categories(transaction);
+    MealCategory? original;
+    if (id != null) {
+      for (final category in registered) {
+        if (category.id == id) original = category;
+      }
+      if (original == null) {
+        return const OptionMutationResult(
+          OptionMutationStatus.invalid,
+          message: '这个分类已不存在，请重新打开分类管理。',
+        );
+      }
+    }
+    final targetScenario = original?.scenario ?? scenario;
+    if (original?.name == displayName) {
+      return const OptionMutationResult(OptionMutationStatus.unchanged);
+    }
+    if (registered.any(
+      (category) =>
+          category.id != id &&
+          category.scenario == targetScenario &&
+          normalizedOptionName(category.name) == normalized,
+    )) {
+      return const OptionMutationResult(
+        OptionMutationStatus.duplicate,
+        message: '这个场景中已有同名分类。',
+      );
+    }
+    if (original == null) {
+      await transaction.insert('categories', {
+        'id': _newId('custom-category'),
+        'name': displayName,
+        'scenario': targetScenario.name,
+        'is_builtin': 0,
+        'is_fallback': 0,
+      });
+    } else {
+      await transaction.update(
+        'categories',
+        {'name': displayName},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      await transaction.update(
+        'options',
+        {'category': displayName},
+        where: 'scenario = ? AND category = ?',
+        whereArgs: [targetScenario.name, original.name],
+      );
+      await transaction.rawUpdate(
+        '''
+        UPDATE option_categories SET category = ?
+        WHERE category = ? AND option_id IN
+          (SELECT id FROM options WHERE scenario = ?)
+      ''',
+        [displayName, original.name, targetScenario.name],
+      );
+    }
+    return const OptionMutationResult(OptionMutationStatus.saved);
+  });
+
+  Future<OptionMutationResult> deleteCategory(String id) =>
+      _database.transaction((transaction) async {
+        final registered = await _categories(transaction);
+        final matches = registered.where((category) => category.id == id);
+        if (matches.isEmpty) {
+          return const OptionMutationResult(
+            OptionMutationStatus.invalid,
+            message: '这个分类已不存在。',
+          );
+        }
+        final category = matches.single;
+        if (category.isBuiltIn) {
+          return const OptionMutationResult(
+            OptionMutationStatus.invalid,
+            message: '内置分类不能删除，可以重命名。',
+          );
+        }
+        final fallback = registered.singleWhere(
+          (value) => value.scenario == category.scenario && value.isFallback,
+        );
+        await transaction.rawInsert(
+          '''
+          INSERT OR IGNORE INTO option_categories (option_id, category)
+          SELECT c.option_id, ? FROM option_categories c
+          JOIN options o ON o.id = c.option_id
+          WHERE o.scenario = ? AND c.category = ?
+        ''',
+          [fallback.name, category.scenario.name, category.name],
+        );
+        await transaction.rawDelete(
+          '''
+          DELETE FROM option_categories WHERE category = ? AND option_id IN
+            (SELECT id FROM options WHERE scenario = ?)
+        ''',
+          [category.name, category.scenario.name],
+        );
+        await transaction.update(
+          'options',
+          {'category': fallback.name},
+          where: 'scenario = ? AND category = ?',
+          whereArgs: [category.scenario.name, category.name],
+        );
+        await transaction.delete(
+          'categories',
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+        return const OptionMutationResult(OptionMutationStatus.saved);
+      });
+
+  String _newId(String prefix) =>
+      '$prefix-${List.generate(16, (_) => _idRandom.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}';
+
   Future<List<FoodOption>> _options(DatabaseExecutor executor) async {
     final rows = await executor.query('options', orderBy: 'rowid');
     final periods = await executor.query('option_periods');
@@ -246,7 +444,7 @@ class MealRepository {
     String? id,
     required String name,
     required Set<MealPeriod> periods,
-    String category = '未分类',
+    String? category,
     String scenario = 'eat',
     String? imagePath,
     String? address,
@@ -255,14 +453,27 @@ class MealRepository {
     bool confirmSameFood = false,
   }) => _database.transaction((transaction) async {
     final displayName = name.trim();
-    final displayCategory = category.trim();
+    final registered = await _categories(transaction);
+    final scopedCategories = registered.where(
+      (value) => value.scenario.name == scenario,
+    );
+    final displayCategory =
+        category?.trim() ??
+        scopedCategories.where((value) => value.isFallback).firstOrNull?.name;
     if (displayName.isEmpty ||
         periods.isEmpty ||
+        displayCategory == null ||
         displayCategory.isEmpty ||
         !MealScenario.values.any((value) => value.name == scenario)) {
       return const OptionMutationResult(
         OptionMutationStatus.invalid,
         message: '请填写名称、一个分类，并至少选择一个适用时段。',
+      );
+    }
+    if (!scopedCategories.any((value) => value.name == displayCategory)) {
+      return const OptionMutationResult(
+        OptionMutationStatus.invalid,
+        message: '请选择当前场景中存在的分类。',
       );
     }
     final options = await _options(transaction);
@@ -329,9 +540,7 @@ class MealRepository {
       );
     }
     final option = FoodOption(
-      id:
-          original?.id ??
-          'custom-${List.generate(16, (_) => _idRandom.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}',
+      id: original?.id ?? _newId('custom'),
       name: displayName,
       art:
           original?.art ??

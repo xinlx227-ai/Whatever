@@ -244,6 +244,7 @@ void main() {
   test(
     'only durable actual changes invalidate; unchanged, invalid, and duplicate actions preserve the round',
     () async {
+      await controller.saveCategory(name: '汤');
       final option = (await create('Soup')).option!;
       expect(option.art, 'plate');
       controller.excludeForSession('soy-milk');
@@ -380,6 +381,7 @@ void main() {
   test(
     'failed SQLite mutation rolls back metadata and periods and leaves the round usable',
     () async {
+      await controller.saveCategory(name: '汤');
       final option = (await create('Soup')).option!;
       final database = await databaseFactoryFfi.openDatabase(
         databasePath,
@@ -559,7 +561,7 @@ void main() {
           options: OpenDatabaseOptions(singleInstance: false),
         );
         try {
-          expect(await inspector.getVersion(), 4);
+          expect(await inspector.getVersion(), 5);
           expect(await inspector.rawQuery('PRAGMA foreign_key_check'), isEmpty);
         } finally {
           await inspector.close();

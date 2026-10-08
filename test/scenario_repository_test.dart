@@ -241,6 +241,8 @@ void main() {
     () async {
       final opened = await open();
       for (final scenario in MealScenario.values) {
+        await opened.saveCategory(name: '私房推荐', scenario: scenario);
+        await opened.saveCategory(name: '常用', scenario: scenario);
         final result = await opened.saveOption(
           name: '我的选择',
           scenario: scenario.name,
@@ -440,7 +442,7 @@ void main() {
         options: OpenDatabaseOptions(singleInstance: false),
       );
       try {
-        expect(await inspector.getVersion(), 4);
+        expect(await inspector.getVersion(), 5);
         expect(await inspector.rawQuery('PRAGMA foreign_key_check'), isEmpty);
       } finally {
         await inspector.close();

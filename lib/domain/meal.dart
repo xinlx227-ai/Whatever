@@ -28,6 +28,22 @@ const scenarioCategories = <MealScenario, List<String>>{
   MealScenario.restaurant: ['火锅', '烧烤', '中餐', '西餐', '快餐', '自助餐', '未分类'],
 };
 
+class MealCategory {
+  const MealCategory({
+    required this.id,
+    required this.name,
+    required this.scenario,
+    required this.isBuiltIn,
+    required this.isFallback,
+  });
+
+  final String id;
+  final String name;
+  final MealScenario scenario;
+  final bool isBuiltIn;
+  final bool isFallback;
+}
+
 enum MealPeriod {
   breakfast('早餐'),
   lunch('午餐'),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../application/meal_controller.dart';
 import '../domain/meal.dart';
+import 'category_manager.dart';
 import 'option_art.dart';
 import 'option_editor.dart';
 import 'scenario_selector.dart';
@@ -101,11 +102,33 @@ class _OptionLibraryState extends State<OptionLibrary> {
           onSelected: busy || model.isBusy ? null : widget.onScenarioChanged,
         ),
         const SizedBox(height: 12),
-        FilledButton.icon(
-          key: const Key('create-option'),
-          onPressed: busy || model.isBusy ? null : () => edit(),
-          icon: const Icon(Icons.add),
-          label: const Text('添加选项'),
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          children: [
+            FilledButton.icon(
+              key: const Key('create-option'),
+              onPressed: busy || model.isBusy ? null : () => edit(),
+              icon: const Icon(Icons.add),
+              label: const Text('添加选项'),
+            ),
+            OutlinedButton.icon(
+              key: const Key('manage-categories'),
+              onPressed: busy || model.isBusy
+                  ? null
+                  : () => Navigator.push<void>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CategoryManager(
+                          controller: model,
+                          scenario: widget.scenario,
+                        ),
+                      ),
+                    ),
+              icon: const Icon(Icons.category_outlined),
+              label: const Text('分类管理'),
+            ),
+          ],
         ),
         const SizedBox(height: 20),
         TextField(

@@ -249,7 +249,7 @@ void main() {
       expect(history.option.periods, legacyOption.periods);
       final database = await inspect();
       try {
-        expect(await database.getVersion(), 4);
+        expect(await database.getVersion(), 5);
         expect(await database.query('history_records'), hasLength(1));
         expect(await database.query('history_items'), hasLength(1));
         expect(await database.rawQuery('PRAGMA foreign_key_check'), isEmpty);
