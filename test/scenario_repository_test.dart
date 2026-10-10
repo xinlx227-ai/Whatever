@@ -442,7 +442,7 @@ void main() {
         options: OpenDatabaseOptions(singleInstance: false),
       );
       try {
-        expect(await inspector.getVersion(), 5);
+        expect(await inspector.getVersion(), 6);
         expect(await inspector.rawQuery('PRAGMA foreign_key_check'), isEmpty);
       } finally {
         await inspector.close();

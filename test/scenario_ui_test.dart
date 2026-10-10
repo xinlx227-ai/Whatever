@@ -4,6 +4,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:path/path.dart' as path;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:whatever/application/meal_controller.dart';
@@ -275,7 +276,16 @@ void main() {
       await tap(tester, find.text('选项库'));
       await tap(tester, scenario('library', MealScenario.restaurant));
       await tap(tester, find.byKey(const Key('create-option')));
-      expect(find.byIcon(Icons.storefront_outlined), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is SvgPicture &&
+              widget.bytesLoader is SvgAssetLoader &&
+              (widget.bytesLoader as SvgAssetLoader).assetName ==
+                  'assets/food/storefront.svg',
+        ),
+        findsOneWidget,
+      );
       await tester.enterText(find.byKey(const Key('option-name')), '街角小馆');
       await save(tester);
       expect(find.text('已有同名餐厅'), findsOneWidget);

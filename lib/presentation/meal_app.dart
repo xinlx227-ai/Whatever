@@ -7,6 +7,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../application/meal_controller.dart';
 import '../domain/meal.dart';
+import '../domain/meal_preferences.dart';
+import 'card_draw.dart';
 import 'wheel.dart';
 import 'option_art.dart';
 import 'option_library.dart';
@@ -27,46 +29,72 @@ class MealApp extends StatelessWidget {
   final String? imageRecoveryNotice;
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    title: '这一餐',
-    debugShowCheckedModeBanner: false,
-    locale: const Locale('zh', 'CN'),
-    localizationsDelegates: GlobalMaterialLocalizations.delegates,
-    supportedLocales: const [Locale('zh', 'CN')],
-    theme: ThemeData(
-      useMaterial3: true,
-      scaffoldBackgroundColor: paper,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: accent,
-        surface: paper,
-        primary: accent,
-        onSurface: ink,
-      ),
-      textTheme: ThemeData.light().textTheme.apply(
-        bodyColor: ink,
-        displayColor: ink,
-      ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: paper,
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
-      ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          backgroundColor: accent,
-          foregroundColor: Colors.white,
-          minimumSize: const Size(double.infinity, 56),
-          textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: controller,
+    builder: (context, _) {
+      final cards = controller.preferences.mode == DrawMode.cards;
+      final background = cards ? const Color(0xff100d18) : paper;
+      final foreground = cards ? const Color(0xfff6eddf) : ink;
+      final primary = cards ? const Color(0xffdec183) : accent;
+      final colors =
+          ColorScheme.fromSeed(
+            brightness: cards ? Brightness.dark : Brightness.light,
+            seedColor: primary,
+            surface: background,
+            primary: primary,
+            onPrimary: cards ? const Color(0xff21192e) : Colors.white,
+            onSurface: foreground,
+          ).copyWith(
+            onSurfaceVariant: cards ? const Color(0xffc7bbd5) : muted,
+            surfaceContainer: cards ? const Color(0xff2a1d3e) : soft,
+            outlineVariant: cards
+                ? const Color(0xff6d587c)
+                : const Color(0xffd6c6b3),
+          );
+      return MaterialApp(
+        title: '这一餐',
+        debugShowCheckedModeBanner: false,
+        locale: const Locale('zh', 'CN'),
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        supportedLocales: const [Locale('zh', 'CN')],
+        theme: ThemeData(
+          useMaterial3: true,
+          brightness: colors.brightness,
+          scaffoldBackgroundColor: background,
+          colorScheme: colors,
+          textTheme: ThemeData.light().textTheme.apply(
+            bodyColor: foreground,
+            displayColor: foreground,
+          ),
+          appBarTheme: AppBarTheme(
+            backgroundColor: background,
+            foregroundColor: foreground,
+            systemOverlayStyle: cards
+                ? SystemUiOverlayStyle.light
+                : SystemUiOverlayStyle.dark,
+          ),
+          filledButtonTheme: FilledButtonThemeData(
+            style: FilledButton.styleFrom(
+              backgroundColor: primary,
+              foregroundColor: colors.onPrimary,
+              minimumSize: const Size(double.infinity, 56),
+              textStyle: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ),
           ),
         ),
-      ),
-    ),
-    home: _MealHome(
-      controller: controller,
-      recoveredImage: recoveredImage,
-      imageRecoveryNotice: imageRecoveryNotice,
-    ),
+        home: _MealHome(
+          controller: controller,
+          recoveredImage: recoveredImage,
+          imageRecoveryNotice: imageRecoveryNotice,
+        ),
+      );
+    },
   );
 }
 
@@ -147,8 +175,9 @@ class _MealHome extends StatefulWidget {
 }
 
 class _MealHomeState extends State<_MealHome>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController spin;
+  late final AnimationController cardReveal;
   late final CurvedAnimation curve;
   int tab = 1;
   MealScenario libraryScenario = MealScenario.eat;
@@ -159,6 +188,11 @@ class _MealHomeState extends State<_MealHome>
   double fromAngle = 0, toAngle = 0;
   bool asking = false;
   MealController get model => widget.controller;
+  bool get cardsMode => model.preferences.mode == DrawMode.cards;
+  Color get paper => Theme.of(context).colorScheme.surface;
+  Color get accent => Theme.of(context).colorScheme.primary;
+  Color get muted => Theme.of(context).colorScheme.onSurfaceVariant;
+  Color get soft => Theme.of(context).colorScheme.surfaceContainer;
   ScenarioCopy get scenarioCopy => ScenarioCopy.forScenario(model.scenario);
   bool get hasActiveCookingShortage =>
       model.scenario == MealScenario.cook &&
@@ -172,6 +206,7 @@ class _MealHomeState extends State<_MealHome>
       model.availableCount < model.requestedCount - model.results.length;
   bool get pinCookingActions =>
       tab == 1 &&
+      !cardsMode &&
       model.scenario == MealScenario.cook &&
       MediaQuery.sizeOf(context).height >= 700 &&
       MediaQuery.textScalerOf(context).scale(14) <= 18;
@@ -179,11 +214,12 @@ class _MealHomeState extends State<_MealHome>
   @override
   void initState() {
     super.initState();
-    spin = AnimationController(
+    spin = AnimationController(vsync: this, duration: Duration(seconds: 4));
+    cardReveal = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 4),
+      duration: Duration(milliseconds: 800),
     );
-    curve = CurvedAnimation(parent: spin, curve: const Cubic(.12, .64, .13, 1));
+    curve = CurvedAnimation(parent: spin, curve: Cubic(.12, .64, .13, 1));
     model.addListener(modelChanged);
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => recoverImage());
@@ -200,18 +236,16 @@ class _MealHomeState extends State<_MealHome>
     final use = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('找回了刚才选择的图片'),
-        content: const Text(
-          '应用重新打开了，未保存的表单没有保留。可以用这张图片新建选项；如需修改已有选项，请回选项库重新编辑。',
-        ),
+        title: Text('找回了刚才选择的图片'),
+        content: Text('应用重新打开了，未保存的表单没有保留。可以用这张图片新建选项；如需修改已有选项，请回选项库重新编辑。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('稍后再选'),
+            child: Text('稍后再选'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('用图片新建'),
+            child: Text('用图片新建'),
           ),
         ],
       ),
@@ -237,16 +271,24 @@ class _MealHomeState extends State<_MealHome>
     model.removeListener(modelChanged);
     curve.dispose();
     spin.dispose();
+    cardReveal.dispose();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) showCompletion();
+    if (state == AppLifecycleState.resumed) {
+      model.refreshCardAvailability();
+      showCompletion();
+    }
   }
 
   void modelChanged() {
-    if (!model.hasRound) resetWheel();
+    if (!model.hasRound) {
+      resetWheel();
+      cardReveal.stop(canceled: true);
+      cardReveal.value = 0;
+    }
     if (model.restartNotice != null) showRestartNotice();
   }
 
@@ -276,12 +318,12 @@ class _MealHomeState extends State<_MealHome>
       final useAvailable = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('这次的菜还不够'),
+          title: Text('这次的菜还不够'),
           content: Text('当前条件下只有 $available 道菜，可以改为抽 $available 道，或调整筛选条件。'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('调整筛选条件'),
+              child: Text('调整筛选条件'),
             ),
             TextButton(
               onPressed: () => Navigator.pop(context, true),
@@ -308,8 +350,8 @@ class _MealHomeState extends State<_MealHome>
     toAngle =
         fromAngle + math.pi * 2 * 7 + (target - fromAngle) % (math.pi * 2);
     spin.duration = reduced
-        ? const Duration(milliseconds: 180)
-        : const Duration(seconds: 4);
+        ? Duration(milliseconds: 180)
+        : Duration(seconds: 4);
     try {
       await spin.forward(from: 0).orCancel;
       if (!mounted || !model.isDrawing) return;
@@ -323,6 +365,37 @@ class _MealHomeState extends State<_MealHome>
     } on TickerCanceled {
       /* Abandonment cancels the visual reveal. */
     }
+  }
+
+  Future<void> revealCard() async {
+    if (asking || !model.revealSelectedCard()) return;
+    cardReveal.duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration(milliseconds: 120)
+        : Duration(milliseconds: 800);
+    try {
+      await cardReveal.forward(from: 0).orCancel;
+      if (!mounted || !model.isDrawing) return;
+      model.finishDraw();
+      showCompletion();
+      final lifecycle = WidgetsBinding.instance.lifecycleState;
+      if (tab == 1 &&
+          (lifecycle == null || lifecycle == AppLifecycleState.resumed)) {
+        await HapticFeedback.lightImpact();
+      }
+    } on TickerCanceled {
+      // A shared restart cancels the visual reveal and its unsaved round.
+    }
+  }
+
+  Future<void> selectMode(DrawMode mode) async {
+    if (mode == model.preferences.mode || model.isBusy) return;
+    if (model.isModeLocked) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('这一餐已经开始，确认或重新开始后才能切换模式。')));
+      return;
+    }
+    await model.updatePreferences(model.preferences.copyWith(mode: mode));
   }
 
   void showCompletion() {
@@ -345,7 +418,7 @@ class _MealHomeState extends State<_MealHome>
         alignment: 1,
         duration: MediaQuery.disableAnimationsOf(context)
             ? Duration.zero
-            : const Duration(milliseconds: 250),
+            : Duration(milliseconds: 250),
         curve: Curves.easeOut,
       );
     });
@@ -363,7 +436,7 @@ class _MealHomeState extends State<_MealHome>
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context, false),
-                  child: const Text('继续这一餐'),
+                  child: Text('继续这一餐'),
                 ),
                 TextButton(
                   onPressed: () => Navigator.pop(context, true),
@@ -428,12 +501,15 @@ class _MealHomeState extends State<_MealHome>
   }
 
   Future<void> confirm() async {
+    final completeTutorial = cardsMode;
     if (await model.confirm() && mounted) {
+      if (completeTutorial) await model.dismissCardTutorial();
+      if (!mounted) return;
       resetWheel();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(scenarioCopy.confirmationNotice),
-          duration: const Duration(seconds: 2),
+          duration: Duration(seconds: 2),
         ),
       );
     }
@@ -458,25 +534,29 @@ class _MealHomeState extends State<_MealHome>
             }
 
             return AlertDialog(
-              title: const Text('换一个？'),
+              title: Text('换一个？'),
               scrollable: true,
               content: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text('替换「$outgoingName」，其他选择会保留。'),
-                  const SizedBox(height: 12),
-                  const Text('重新抽：放回候选，可能再次抽中。\n排除它：这次使用应用期间不再抽中。'),
-                  const SizedBox(height: 12),
-                  const Text('选择后请手动开始替换，不能撤销；也可以重新开始整餐。'),
+                  SizedBox(height: 12),
+                  Text('重新抽：放回候选，可能再次抽中。\n排除它：这次使用应用期间不再抽中。'),
+                  SizedBox(height: 12),
+                  Text(
+                    cardsMode
+                        ? '选择后请重新选牌，再点一次翻开；也可以重新开始整餐。'
+                        : '选择后请手动开始替换，不能撤销；也可以重新开始整餐。',
+                  ),
                   if (shortage != null) ...[
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12),
                     Semantics(
                       liveRegion: true,
                       child: Text(
                         shortage!,
-                        key: const Key('replacement-shortage'),
-                        style: const TextStyle(color: accent),
+                        key: Key('replacement-shortage'),
+                        style: TextStyle(color: accent),
                       ),
                     ),
                   ],
@@ -485,17 +565,17 @@ class _MealHomeState extends State<_MealHome>
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('暂时不换'),
+                  child: Text('暂时不换'),
                 ),
                 TextButton(
-                  key: const Key('replacement-redraw'),
+                  key: Key('replacement-redraw'),
                   onPressed: () => choose(ReplacementChoice.redraw),
-                  child: const Text('重新抽'),
+                  child: Text('重新抽'),
                 ),
                 TextButton(
-                  key: const Key('replacement-exclude'),
+                  key: Key('replacement-exclude'),
                   onPressed: () => choose(ReplacementChoice.exclude),
-                  child: const Text('排除它'),
+                  child: Text('排除它'),
                 ),
               ],
             );
@@ -580,50 +660,56 @@ class _MealHomeState extends State<_MealHome>
           child: Align(
             alignment: Alignment.topCenter,
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
+              constraints: BoxConstraints(maxWidth: 520),
               child: SingleChildScrollView(
                 key: ValueKey('page-$tab'),
-                padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            '这一餐',
-                            style: TextStyle(
-                              fontSize: 21,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1,
+                padding: EdgeInsets.fromLTRB(24, 16, 24, 24),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: cardsMode && tab == 1
+                      ? model.cancelCardSelection
+                      : null,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '这一餐',
+                              style: TextStyle(
+                                fontSize: 21,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1,
+                              ),
                             ),
                           ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: soft,
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                            child: Text(
+                              tab == 0
+                                  ? libraryScenario.label
+                                  : '${model.period.label} · ${model.scenario.label}',
+                              style: TextStyle(fontSize: 13),
+                            ),
                           ),
-                          decoration: BoxDecoration(
-                            color: soft,
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          child: Text(
-                            tab == 0
-                                ? libraryScenario.label
-                                : '${model.period.label} · ${model.scenario.label}',
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (tab == 1)
-                      ...decide()
-                    else if (tab == 0)
-                      ...library()
-                    else
-                      ...history(),
-                  ],
+                        ],
+                      ),
+                      if (tab == 1)
+                        ...decide()
+                      else if (tab == 0)
+                        ...library()
+                      else
+                        ...history(),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -637,7 +723,7 @@ class _MealHomeState extends State<_MealHome>
                 top: false,
                 bottom: false,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+                  padding: EdgeInsets.fromLTRB(24, 8, 24, 8),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: completion(),
@@ -649,7 +735,7 @@ class _MealHomeState extends State<_MealHome>
               indicatorColor: soft,
               selectedIndex: tab,
               onDestinationSelected: selectTab,
-              destinations: const [
+              destinations: [
                 NavigationDestination(
                   icon: Icon(Icons.menu_book_outlined),
                   label: '选项库',
@@ -673,7 +759,7 @@ class _MealHomeState extends State<_MealHome>
   List<Widget> decide() => [
     SizedBox(height: model.scenario == MealScenario.cook ? 12 : 24),
     if (model.scenario != MealScenario.cook) ...[
-      const Text(
+      Text(
         '好好吃饭 · 好好生活',
         style: TextStyle(
           color: accent,
@@ -682,30 +768,40 @@ class _MealHomeState extends State<_MealHome>
           letterSpacing: 2,
         ),
       ),
-      const SizedBox(height: 8),
+      SizedBox(height: 8),
     ],
     Text(
       scenarioCopy.heading,
-      style: const TextStyle(
-        fontSize: 30,
-        fontWeight: FontWeight.w800,
-        height: 1.3,
-      ),
+      style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, height: 1.3),
     ),
     if (model.scenario != MealScenario.cook) ...[
-      const SizedBox(height: 8),
-      const Text(
-        '把纠结留给转盘，把期待留给下一口。',
+      SizedBox(height: 8),
+      Text(
+        cardsMode ? '把答案藏进卡牌，把期待留给下一口。' : '把纠结留给转盘，把期待留给下一口。',
         style: TextStyle(color: muted, fontSize: 13),
       ),
     ],
-    const SizedBox(height: 12),
+    SizedBox(height: 12),
     ScenarioSelector(
       page: 'decide',
       selected: model.scenario,
       onSelected: model.isBusy ? null : selectScenario,
     ),
-    const SizedBox(height: 8),
+    SizedBox(height: 8),
+    Wrap(
+      spacing: 12,
+      children: [
+        for (final mode in DrawMode.values)
+          ChoiceChip(
+            key: ValueKey('draw-mode-${mode.name}'),
+            label: Text(mode == DrawMode.wheel ? '转盘' : '抽卡'),
+            selected: model.preferences.mode == mode,
+            onSelected: model.isBusy ? null : (_) => selectMode(mode),
+            showCheckmark: false,
+          ),
+      ],
+    ),
+    SizedBox(height: 8),
     Wrap(
       spacing: 8,
       runSpacing: 4,
@@ -721,7 +817,7 @@ class _MealHomeState extends State<_MealHome>
               side: BorderSide(
                 color: model.period == period
                     ? accent
-                    : const Color(0xffd6c6b3),
+                    : Theme.of(context).colorScheme.outlineVariant,
               ),
               labelStyle: TextStyle(
                 color: model.period == period ? accent : muted,
@@ -730,16 +826,16 @@ class _MealHomeState extends State<_MealHome>
           )
           .toList(),
     ),
-    const SizedBox(height: 12),
+    SizedBox(height: 12),
     Row(
       children: [
         Expanded(
           child: Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
-              key: const Key('category-filter-button'),
+              key: Key('category-filter-button'),
               onPressed: model.isBusy ? null : selectCategories,
-              icon: const Icon(Icons.filter_list),
+              icon: Icon(Icons.filter_list),
               label: Text(
                 model.selectedCategoryIds.isEmpty
                     ? '全部分类'
@@ -750,15 +846,15 @@ class _MealHomeState extends State<_MealHome>
         ),
         Text(
           '${model.availableCount} 个候选',
-          style: const TextStyle(color: muted, fontSize: 12),
+          style: TextStyle(color: muted, fontSize: 12),
         ),
       ],
     ),
     if (model.scenario == MealScenario.cook) ...[
-      const SizedBox(height: 8),
-      const Text('这一餐，做几道？', style: TextStyle(fontWeight: FontWeight.w700)),
+      SizedBox(height: 8),
+      Text('这一餐，做几道？', style: TextStyle(fontWeight: FontWeight.w700)),
       Wrap(
-        key: const Key('cooking-count-controls'),
+        key: Key('cooking-count-controls'),
         spacing: 8,
         runSpacing: 4,
         children: [
@@ -772,7 +868,7 @@ class _MealHomeState extends State<_MealHome>
                   : (_) => selectCookingCount(count),
             ),
           ChoiceChip(
-            key: const Key('cooking-count-custom'),
+            key: Key('cooking-count-custom'),
             label: Text(
               model.cookingCount > 3 ? '${model.cookingCount} 道 · 自定义' : '自定义',
             ),
@@ -781,118 +877,207 @@ class _MealHomeState extends State<_MealHome>
           ),
         ],
       ),
-      const SizedBox(height: 8),
+      SizedBox(height: 8),
       Semantics(
         liveRegion: true,
         child: Text(
           model.pendingReplacementIndex == null
-              ? '已选 ${model.results.length} / ${model.requestedCount} 道 · 每次转一道'
+              ? '已选 ${model.results.length} / ${model.requestedCount} 道 · ${cardsMode ? '亲手翻开卡牌' : '每次转一道'}'
               : '待替换第 ${model.pendingReplacementIndex! + 1} 道 · 其他选择已保留',
-          key: const Key('cooking-progress'),
-          style: const TextStyle(color: muted),
+          key: Key('cooking-progress'),
+          style: TextStyle(color: muted),
         ),
       ),
     ],
-    Center(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth:
-              (MediaQuery.sizeOf(context).height -
-                      MediaQuery.paddingOf(context).vertical -
-                      // Reserve both control rows, confirmation and navigation.
-                      604)
-                  .clamp(186.0, 330.0),
-        ),
-        child: AnimatedBuilder(
-          animation: curve,
-          builder: (context, _) => MealWheel(
-            options: model.candidates,
-            centerLabel: scenarioCopy.wheelLabel,
-            angle: MediaQuery.disableAnimationsOf(context) && model.isDrawing
-                ? toAngle
-                : fromAngle + (toAngle - fromAngle) * curve.value,
+    if (cardsMode)
+      ...cardDecision()
+    else ...[
+      Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth:
+                (MediaQuery.sizeOf(context).height -
+                        MediaQuery.paddingOf(context).vertical -
+                        // Reserve both control rows, confirmation and navigation.
+                        660)
+                    .clamp(136.0, 330.0),
+          ),
+          child: AnimatedBuilder(
+            animation: curve,
+            builder: (context, _) => MealWheel(
+              options: model.candidates,
+              centerLabel: scenarioCopy.wheelLabel,
+              angle: MediaQuery.disableAnimationsOf(context) && model.isDrawing
+                  ? toAngle
+                  : fromAngle + (toAngle - fromAngle) * curve.value,
+            ),
           ),
         ),
       ),
-    ),
-    Semantics(
-      key: resultsKey,
-      liveRegion: true,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: model.results.isNotEmpty
-            ? Column(
-                children: [
-                  for (var index = 0; index < model.results.length; index++)
-                    resultSlot(index),
-                  if (model.isDrawing && model.pendingReplacementIndex == null)
-                    const Text('下一道正在挑选…', style: TextStyle(color: muted)),
-                ],
-              )
-            : Center(
-                child: Text(
-                  model.isDrawing ? '让好胃口，再转一会儿…' : '不必想好答案，转一下就知道。',
-                  style: const TextStyle(color: muted),
+      Semantics(
+        key: resultsKey,
+        liveRegion: true,
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 16),
+          child: model.results.isNotEmpty
+              ? Column(
+                  children: [
+                    for (var index = 0; index < model.results.length; index++)
+                      resultSlot(index),
+                    if (model.isDrawing &&
+                        model.pendingReplacementIndex == null)
+                      Text('下一道正在挑选…', style: TextStyle(color: muted)),
+                  ],
+                )
+              : Center(
+                  child: Text(
+                    model.isDrawing ? '让好胃口，再转一会儿…' : '不必想好答案，转一下就知道。',
+                    style: TextStyle(color: muted),
+                  ),
                 ),
-              ),
-      ),
-    ),
-    if (hasActiveCookingShortage)
-      Padding(
-        key: activeShortageKey,
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Semantics(
-          key: const Key('active-cooking-shortage'),
-          liveRegion: true,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '当前条件下还剩 ${model.availableCount} 道候选，无法补齐 ${model.requestedCount} 道菜。',
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 4),
-              Text('可以确认已选的 ${model.results.length} 道菜，或调整条件重新开始。'),
-              TextButton(
-                key: const Key('adjust-round-conditions'),
-                onPressed: selectCategories,
-                child: const Text('调整条件'),
-              ),
-            ],
-          ),
         ),
       ),
-    if (model.error != null)
-      Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Semantics(
-          liveRegion: true,
-          child: Text(model.error!, style: const TextStyle(color: accent)),
+      if (hasActiveCookingShortage)
+        Padding(
+          key: activeShortageKey,
+          padding: EdgeInsets.only(bottom: 12),
+          child: Semantics(
+            key: Key('active-cooking-shortage'),
+            liveRegion: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '当前条件下还剩 ${model.availableCount} 道候选，无法补齐 ${model.requestedCount} 道菜。',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                SizedBox(height: 4),
+                Text('可以确认已选的 ${model.results.length} 道菜，或调整条件重新开始。'),
+                TextButton(
+                  key: Key('adjust-round-conditions'),
+                  onPressed: selectCategories,
+                  child: Text('调整条件'),
+                ),
+              ],
+            ),
+          ),
         ),
-      ),
-    if (model.candidates.isEmpty && !model.hasRound) ...[
-      const Text('没有符合条件的选项', style: TextStyle(fontWeight: FontWeight.w700)),
-      const SizedBox(height: 4),
-      const Text('试试其他分类或餐段，也可以恢复本次排除的选项。已停用的选项仍会保持停用。'),
-      Wrap(
-        spacing: 8,
-        children: [
-          TextButton(
-            key: const Key('adjust-empty-conditions'),
-            onPressed: model.isBusy ? null : selectCategories,
-            child: const Text('调整条件'),
+      if (model.error != null)
+        Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: Semantics(
+            liveRegion: true,
+            child: Text(model.error!, style: TextStyle(color: accent)),
           ),
-          TextButton(
-            key: const Key('restore-session-exclusions'),
-            onPressed: model.isBusy || model.sessionExclusions.isEmpty
-                ? null
-                : model.restoreSessionExclusions,
-            child: const Text('恢复本次排除'),
-          ),
-        ],
-      ),
+        ),
+      if (model.candidates.isEmpty && !model.hasRound) ...[
+        Text('没有符合条件的选项', style: TextStyle(fontWeight: FontWeight.w700)),
+        SizedBox(height: 4),
+        Text('试试其他分类或餐段，也可以恢复本次排除的选项。已停用的选项仍会保持停用。'),
+        Wrap(
+          spacing: 8,
+          children: [
+            TextButton(
+              key: Key('adjust-empty-conditions'),
+              onPressed: model.isBusy ? null : selectCategories,
+              child: Text('调整条件'),
+            ),
+            TextButton(
+              key: Key('restore-session-exclusions'),
+              onPressed: model.isBusy || model.sessionExclusions.isEmpty
+                  ? null
+                  : model.restoreSessionExclusions,
+              child: Text('恢复本次排除'),
+            ),
+          ],
+        ),
+      ],
+      if (!pinCookingActions) ...completion(),
     ],
-    if (!pinCookingActions) ...completion(),
+  ];
+
+  List<Widget> cardDecision() => [
+    if (!model.isCardFlowSupported) ...[
+      SizedBox(height: 24),
+      Semantics(
+        liveRegion: true,
+        child: Text(
+          '本餐计划做 ${model.requestedCount} 道菜。多张卡牌的收集流程还在准备中，可以切回转盘继续按这个菜数抽取。',
+          key: Key('cards-target-many-notice'),
+          style: TextStyle(height: 1.6),
+        ),
+      ),
+      SizedBox(height: 16),
+      FilledButton(
+        key: Key('cards-use-wheel'),
+        onPressed: model.isBusy ? null : () => selectMode(DrawMode.wheel),
+        child: Text('用转盘抽 ${model.requestedCount} 道菜'),
+      ),
+    ] else ...[
+      CardDraw(
+        controller: model,
+        revealAnimation: cardReveal,
+        onReveal: revealCard,
+      ),
+      if (model.error != null)
+        Semantics(
+          liveRegion: true,
+          child: Text(model.error!, style: TextStyle(color: accent)),
+        ),
+      if (model.candidates.isEmpty && !model.hasRound)
+        Wrap(
+          spacing: 8,
+          children: [
+            TextButton(
+              key: Key('adjust-empty-conditions'),
+              onPressed: model.isBusy ? null : selectCategories,
+              child: Text('调整条件'),
+            ),
+            TextButton(
+              key: Key('restore-session-exclusions'),
+              onPressed: model.isBusy || model.sessionExclusions.isEmpty
+                  ? null
+                  : model.restoreSessionExclusions,
+              child: Text('恢复本次排除'),
+            ),
+          ],
+        ),
+      if (model.results.isNotEmpty &&
+          model.pendingReplacementIndex == null &&
+          !model.isDrawing) ...[
+        FilledButton(
+          key: Key('primary-action'),
+          onPressed: model.canConfirm ? confirm : null,
+          child: Text(
+            model.isSaving
+                ? '正在记下这一餐…'
+                : model.hasConfirmationAttempt && model.error != null
+                ? '重试保存'
+                : model.scenario == MealScenario.cook
+                ? '就做这 1 道菜'
+                : scenarioCopy.confirmAction,
+          ),
+        ),
+        SizedBox(height: 8),
+        OutlinedButton(
+          key: Key('replace-result-0'),
+          onPressed: model.canReplace(0) ? () => replace(0) : null,
+          style: OutlinedButton.styleFrom(
+            minimumSize: Size(double.infinity, 48),
+          ),
+          child: Text('换一个'),
+        ),
+      ],
+      SizedBox(key: completionKey, height: 12),
+      if (model.hasRound)
+        Center(
+          child: TextButton(
+            key: Key('restart-round'),
+            onPressed: model.isBusy ? null : restartRound,
+            child: Text('重新开始这一餐'),
+          ),
+        ),
+    ],
   ];
 
   Widget resultSlot(int index) {
@@ -901,7 +1086,7 @@ class _MealHomeState extends State<_MealHome>
     final pending = model.pendingReplacementIndex == index;
     return Padding(
       key: cooking ? ValueKey('cooking-result-$index') : null,
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: EdgeInsets.symmetric(vertical: 6),
       child: Column(
         key: pending ? pendingReplacementKey : null,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -909,7 +1094,7 @@ class _MealHomeState extends State<_MealHome>
           if (pending)
             Container(
               key: ValueKey('pending-replacement-$index'),
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: soft,
                 borderRadius: BorderRadius.circular(18),
@@ -922,10 +1107,7 @@ class _MealHomeState extends State<_MealHome>
                     : cooking
                     ? '第 ${index + 1} 道等待开始替换'
                     : '等待开始替换',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               ),
             )
           else ...[
@@ -935,11 +1117,11 @@ class _MealHomeState extends State<_MealHome>
                   : MainAxisAlignment.center,
               children: [
                 if (cooking) ...[
-                  Text('${index + 1}', style: const TextStyle(color: muted)),
-                  const SizedBox(width: 12),
+                  Text('${index + 1}', style: TextStyle(color: muted)),
+                  SizedBox(width: 12),
                 ],
                 OptionArt(option: option, size: cooking ? 48 : 64),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Flexible(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -947,12 +1129,12 @@ class _MealHomeState extends State<_MealHome>
                       if (!cooking)
                         Text(
                           scenarioCopy.resultHint,
-                          style: const TextStyle(color: muted, fontSize: 12),
+                          style: TextStyle(color: muted, fontSize: 12),
                         ),
                       Text(
                         option.name,
                         key: index == model.results.length - 1
-                            ? const Key('draw-result')
+                            ? Key('draw-result')
                             : null,
                         style: TextStyle(
                           fontSize: cooking ? 20 : 25,
@@ -961,16 +1143,10 @@ class _MealHomeState extends State<_MealHome>
                       ),
                       if (model.scenario == MealScenario.restaurant &&
                           option.address != null)
-                        Text(
-                          option.address!,
-                          style: const TextStyle(color: muted),
-                        ),
+                        Text(option.address!, style: TextStyle(color: muted)),
                       if (model.scenario == MealScenario.restaurant &&
                           option.notes != null)
-                        Text(
-                          option.notes!,
-                          style: const TextStyle(color: muted),
-                        ),
+                        Text(option.notes!, style: TextStyle(color: muted)),
                     ],
                   ),
                 ),
@@ -985,8 +1161,8 @@ class _MealHomeState extends State<_MealHome>
                   onPressed: model.canReplace(index)
                       ? () => replace(index)
                       : null,
-                  style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
-                  child: const Text('换一个'),
+                  style: TextButton.styleFrom(minimumSize: Size(48, 48)),
+                  child: Text('换一个'),
                 ),
               ),
             ),
@@ -999,9 +1175,9 @@ class _MealHomeState extends State<_MealHome>
   List<Widget> completion() => [
     if (model.pendingReplacementIndex != null)
       Padding(
-        padding: const EdgeInsets.only(bottom: 8),
+        padding: EdgeInsets.only(bottom: 8),
         child: FilledButton(
-          key: const Key('replacement-start'),
+          key: Key('replacement-start'),
           onPressed: model.canDraw ? draw : null,
           child: Text(model.isDrawing ? '正在替换…' : '开始替换'),
         ),
@@ -1010,20 +1186,20 @@ class _MealHomeState extends State<_MealHome>
         model.results.isNotEmpty &&
         model.results.length < model.requestedCount)
       Padding(
-        padding: const EdgeInsets.only(bottom: 8),
+        padding: EdgeInsets.only(bottom: 8),
         child: OutlinedButton(
-          key: const Key('draw-next-dish'),
+          key: Key('draw-next-dish'),
           onPressed: model.pendingReplacementIndex == null && model.canDraw
               ? draw
               : null,
           style: OutlinedButton.styleFrom(
-            minimumSize: const Size(double.infinity, 48),
+            minimumSize: Size(double.infinity, 48),
           ),
           child: Text(model.isDrawing ? '正在挑选下一道…' : '再转一道'),
         ),
       ),
     FilledButton(
-      key: const Key('primary-action'),
+      key: Key('primary-action'),
       onPressed: model.results.isNotEmpty
           ? model.canConfirm
                 ? confirm
@@ -1045,7 +1221,7 @@ class _MealHomeState extends State<_MealHome>
             : scenarioCopy.drawAction,
       ),
     ),
-    const SizedBox(height: 12),
+    SizedBox(height: 12),
     Center(
       key: completionKey,
       child: Text(
@@ -1054,15 +1230,15 @@ class _MealHomeState extends State<_MealHome>
             : model.result != null
             ? '确认之后，才会记入足迹'
             : '一点小期待，一顿好好吃的饭',
-        style: const TextStyle(color: muted, fontSize: 12),
+        style: TextStyle(color: muted, fontSize: 12),
       ),
     ),
     if (model.hasRound)
       Center(
         child: TextButton(
-          key: const Key('restart-round'),
+          key: Key('restart-round'),
           onPressed: model.isBusy ? null : restartRound,
-          child: const Text('重新开始这一餐'),
+          child: Text('重新开始这一餐'),
         ),
       ),
   ];
@@ -1082,34 +1258,34 @@ class _MealHomeState extends State<_MealHome>
 
   List<Widget> history() {
     final widgets = <Widget>[
-      const SizedBox(height: 32),
-      const Text(
+      SizedBox(height: 32),
+      Text(
         '好好吃饭的足迹',
         style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
       ),
-      const SizedBox(height: 8),
-      const Text('记下每一次不再纠结的决定。', style: TextStyle(color: muted)),
-      const SizedBox(height: 24),
+      SizedBox(height: 8),
+      Text('记下每一次不再纠结的决定。', style: TextStyle(color: muted)),
+      SizedBox(height: 24),
     ];
     if (model.history.isEmpty) {
       widgets.add(
         Center(
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 48),
+            padding: EdgeInsets.symmetric(vertical: 48),
             child: Column(
               children: [
                 foodArt('rice', 120),
-                const SizedBox(height: 24),
-                const Text(
+                SizedBox(height: 24),
+                Text(
                   '第一餐，值得期待',
                   style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700),
                 ),
-                const SizedBox(height: 12),
-                const Text('确认一次选择，就会在这里留下足迹。', style: TextStyle(color: muted)),
-                const SizedBox(height: 32),
+                SizedBox(height: 12),
+                Text('确认一次选择，就会在这里留下足迹。', style: TextStyle(color: muted)),
+                SizedBox(height: 32),
                 FilledButton(
                   onPressed: () => selectTab(1),
-                  child: const Text('去决定这一餐'),
+                  child: Text('去决定这一餐'),
                 ),
               ],
             ),
@@ -1125,11 +1301,8 @@ class _MealHomeState extends State<_MealHome>
       if (previousDate != date) {
         widgets.add(
           Padding(
-            padding: const EdgeInsets.only(top: 16, bottom: 8),
-            child: Text(
-              date,
-              style: const TextStyle(color: muted, fontSize: 13),
-            ),
+            padding: EdgeInsets.only(top: 16, bottom: 8),
+            child: Text(date, style: TextStyle(color: muted, fontSize: 13)),
           ),
         );
         previousDate = date;
@@ -1137,29 +1310,33 @@ class _MealHomeState extends State<_MealHome>
       widgets.add(
         Container(
           key: ValueKey('history-${entry.operationId}'),
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: Color(0xffe9ddcb))),
+          padding: EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
           ),
           child: Row(
             children: [
               OptionArt(option: entry.option, size: 60),
-              const SizedBox(width: 16),
+              SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       entry.options.map((option) => option.name).join('、'),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    SizedBox(height: 6),
                     Text(
                       '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')} · ${entry.period.label} · ${MealScenario.fromKey(entry.option.scenario).label}',
-                      style: const TextStyle(color: muted, fontSize: 12),
+                      style: TextStyle(color: muted, fontSize: 12),
                     ),
                   ],
                 ),

@@ -26,12 +26,20 @@ class ScenarioSelector extends StatelessWidget {
           label: Text(scenario.label),
           selected: selected == scenario,
           onSelected: onSelected == null ? null : (_) => onSelected!(scenario),
-          selectedColor: soft,
+          selectedColor: Theme.of(context).brightness == Brightness.dark
+              ? Theme.of(context).colorScheme.surfaceContainerHighest
+              : soft,
           showCheckmark: false,
           side: BorderSide(
-            color: selected == scenario ? accent : const Color(0xffd6c6b3),
+            color: selected == scenario
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.outlineVariant,
           ),
-          labelStyle: TextStyle(color: selected == scenario ? accent : muted),
+          labelStyle: TextStyle(
+            color: selected == scenario
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
     ],
   );

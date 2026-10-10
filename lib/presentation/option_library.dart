@@ -6,7 +6,6 @@ import 'category_manager.dart';
 import 'option_art.dart';
 import 'option_editor.dart';
 import 'scenario_selector.dart';
-import 'wheel.dart';
 
 class OptionLibrary extends StatefulWidget {
   const OptionLibrary({
@@ -80,6 +79,8 @@ class _OptionLibraryState extends State<OptionLibrary> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final dark = colors.brightness == Brightness.dark;
     final foods = model.libraryOptions(
       scenario: widget.scenario.name,
       query: query,
@@ -94,7 +95,10 @@ class _OptionLibraryState extends State<OptionLibrary> {
           style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 8),
-        const Text('留下喜欢的，让下一餐多一点期待。', style: TextStyle(color: muted)),
+        Text(
+          '留下喜欢的，让下一餐多一点期待。',
+          style: TextStyle(color: colors.onSurfaceVariant),
+        ),
         const SizedBox(height: 20),
         ScenarioSelector(
           page: 'library',
@@ -158,7 +162,10 @@ class _OptionLibraryState extends State<OptionLibrary> {
           ],
         ),
         const SizedBox(height: 12),
-        Text('${foods.length} 个选项', style: const TextStyle(color: muted)),
+        Text(
+          '${foods.length} 个选项',
+          style: TextStyle(color: colors.onSurfaceVariant),
+        ),
         if (error != null)
           Semantics(
             liveRegion: true,
@@ -182,11 +189,13 @@ class _OptionLibraryState extends State<OptionLibrary> {
             padding: const EdgeInsets.only(bottom: 12),
             child: Card(
               elevation: 0,
-              color: const Color(0xfffffdf8),
+              color: dark ? colors.surfaceContainer : const Color(0xfffffdf8),
               margin: EdgeInsets.zero,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(18),
-                side: const BorderSide(color: Color(0xffe9ddcb)),
+                side: BorderSide(
+                  color: dark ? colors.outlineVariant : const Color(0xffe9ddcb),
+                ),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -212,8 +221,8 @@ class _OptionLibraryState extends State<OptionLibrary> {
                               const SizedBox(height: 4),
                               Text(
                                 '${food.categories.join(' / ')} · ${food.isBuiltIn ? '内置' : '自选'} · ${food.isActive ? '已启用' : '已停用'}',
-                                style: const TextStyle(
-                                  color: muted,
+                                style: TextStyle(
+                                  color: colors.onSurfaceVariant,
                                   fontSize: 12,
                                 ),
                               ),
@@ -223,8 +232,8 @@ class _OptionLibraryState extends State<OptionLibrary> {
                                     .where(food.periods.contains)
                                     .map((period) => period.label)
                                     .join(' · '),
-                                style: const TextStyle(
-                                  color: muted,
+                                style: TextStyle(
+                                  color: colors.onSurfaceVariant,
                                   fontSize: 12,
                                 ),
                               ),
@@ -232,14 +241,18 @@ class _OptionLibraryState extends State<OptionLibrary> {
                                 const SizedBox(height: 4),
                                 Text(
                                   food.address!,
-                                  style: const TextStyle(color: muted),
+                                  style: TextStyle(
+                                    color: colors.onSurfaceVariant,
+                                  ),
                                 ),
                               ],
                               if (food.notes != null) ...[
                                 const SizedBox(height: 4),
                                 Text(
                                   food.notes!,
-                                  style: const TextStyle(color: muted),
+                                  style: TextStyle(
+                                    color: colors.onSurfaceVariant,
+                                  ),
                                 ),
                               ],
                             ],

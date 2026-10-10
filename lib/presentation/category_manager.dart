@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../application/meal_controller.dart';
 import '../domain/meal.dart';
 import 'scenario_selector.dart';
-import 'wheel.dart';
 
 class CategoryManager extends StatefulWidget {
   const CategoryManager({
@@ -108,9 +107,11 @@ class _CategoryManagerState extends State<CategoryManager> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                       '按场景整理分类，下次挑选更轻松。',
-                      style: TextStyle(color: muted),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                     const SizedBox(height: 24),
                     ScenarioSelector(
@@ -134,9 +135,12 @@ class _CategoryManagerState extends State<CategoryManager> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       '内置分类可改名；保留一个兜底分类，接住暂时未归类的选项。',
-                      style: TextStyle(color: muted, height: 1.5),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        height: 1.5,
+                      ),
                     ),
                     if (error != null) ...[
                       const SizedBox(height: 16),
@@ -181,7 +185,11 @@ class _CategoryManagerState extends State<CategoryManager> {
                                       : category.isBuiltIn
                                       ? '内置分类'
                                       : '自建分类',
-                                  style: const TextStyle(color: muted),
+                                  style: TextStyle(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
                                 ),
                                 const SizedBox(height: 8),
                                 Wrap(
@@ -392,9 +400,14 @@ class _CategoryEditorState extends State<_CategoryEditor> {
                       ),
                       if (widget.category != null) ...[
                         const SizedBox(height: 8),
-                        const Text(
+                        Text(
                           '改名会同步更新选项所属分类，已有足迹会保留。',
-                          style: TextStyle(color: muted, height: 1.5),
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                            height: 1.5,
+                          ),
                         ),
                       ],
                       if (error != null) ...[

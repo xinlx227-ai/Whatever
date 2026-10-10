@@ -29,7 +29,7 @@ class MealRepository {
     final database = await factory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-        version: 5,
+        version: 6,
         onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
         onCreate: (database, version) async {
           await database.execute('''
@@ -66,6 +66,7 @@ class MealRepository {
           await _addLibraryMetadata(database);
           await _addScenarioMetadata(database);
           await _addCategoryRegistry(database);
+          await _addCardTutorialPreference(database);
         },
         onUpgrade: (database, oldVersion, newVersion) async {
           if (oldVersion < 2) {
@@ -79,6 +80,9 @@ class MealRepository {
           }
           if (oldVersion < 5) {
             await _addCategoryRegistry(database);
+          }
+          if (oldVersion < 6) {
+            await _addCardTutorialPreference(database);
           }
         },
       ),
@@ -251,16 +255,41 @@ class MealRepository {
     return MealPreferences(
       mode: DrawMode.values.byName(row['mode']! as String),
       excludeYesterday: row['exclude_yesterday'] == 1,
+      cardTutorialDismissed: row['card_tutorial_dismissed'] == 1,
     );
   }
 
-  Future<void> savePreferences(MealPreferences preferences) async {
-    await _database.insert('preferences', {
+  static Future<void> _addCardTutorialPreference(DatabaseExecutor database) =>
+      database.execute('''
+    ALTER TABLE preferences ADD COLUMN card_tutorial_dismissed
+      INTEGER NOT NULL DEFAULT 0 CHECK (card_tutorial_dismissed IN (0, 1))
+  ''');
+
+  Future<void> dismissCardTutorial() async {
+    await _database.update(
+      'preferences',
+      {'card_tutorial_dismissed': 1},
+      where: 'id = ?',
+      whereArgs: [1],
+    );
+  }
+
+  Future<void> savePreferences(
+    MealPreferences preferences,
+  ) => _database.transaction((transaction) async {
+    final existing = (await transaction.query('preferences')).single;
+    await transaction.insert('preferences', {
       'id': 1,
       'mode': preferences.mode.name,
       'exclude_yesterday': preferences.excludeYesterday ? 1 : 0,
+      // Dismissal is permanent, including when an older UI snapshot is saved.
+      'card_tutorial_dismissed':
+          preferences.cardTutorialDismissed ||
+              existing['card_tutorial_dismissed'] == 1
+          ? 1
+          : 0,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
+  });
 
   Future<List<FoodOption>> options() => _options(_database);
 
@@ -548,7 +577,11 @@ class MealRepository {
       name: displayName,
       art:
           original?.art ??
-          (scenario == MealScenario.restaurant.name ? 'storefront' : 'plate'),
+          _defaultArt(
+            scopedCategories.firstWhere(
+              (category) => category.name == displayCategory,
+            ),
+          ),
       periods: Set.unmodifiable(periods),
       scenario: scenario,
       category: displayCategory,
@@ -623,6 +656,24 @@ class MealRepository {
       : value.trim().isEmpty
       ? null
       : value.trim();
+
+  // Assign once at creation using stable category identity, so later option or
+  // category edits keep the same default illustration.
+  static String _defaultArt(MealCategory category) => switch (category.id) {
+    'builtin-category-restaurant-0' => 'shop-hotpot',
+    'builtin-category-restaurant-1' => 'shop-barbecue',
+    'builtin-category-restaurant-2' => 'shop-chinese',
+    'builtin-category-restaurant-3' => 'shop-western',
+    'builtin-category-restaurant-4' => 'shop-fastfood',
+    'builtin-category-restaurant-5' => 'shop-buffet',
+    'builtin-category-eat-0' => 'rice',
+    'builtin-category-eat-1' || 'builtin-category-eat-2' => 'noodle',
+    'builtin-category-eat-4' => 'bun',
+    'builtin-category-eat-5' => 'porridge',
+    'builtin-category-eat-7' => 'burger',
+    'builtin-category-eat-8' => 'drink',
+    _ => category.scenario == MealScenario.restaurant ? 'storefront' : 'plate',
+  };
 
   static bool _samePeriods(Set<MealPeriod> first, Set<MealPeriod> second) =>
       first.length == second.length && first.containsAll(second);

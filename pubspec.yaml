@@ -26,3 +26,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/food/
+    - docs/design/assets/card-back-celestial-black-purple-gold.png

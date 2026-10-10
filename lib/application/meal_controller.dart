@@ -52,6 +52,9 @@ class MealController extends ChangeNotifier {
   Completer<void>? _confirmationFinished;
   String? _restartNotice;
   bool _dataUnavailable = false;
+  List<FoodOption>? _cardDeck;
+  int? _selectedCardIndex;
+  Future<bool>? _tutorialDismissal;
 
   MealPeriod get period => _period;
   MealScenario get scenario => _scenario;
@@ -68,6 +71,33 @@ class MealController extends ChangeNotifier {
   List<FoodOption> get candidates => _roundCandidates ?? _eligibleCandidates();
   int get cookingCount => _cookingCount;
   int get requestedCount => _scenario == MealScenario.cook ? _cookingCount : 1;
+  bool get isSingleTarget => requestedCount == 1;
+  bool get isCardFlowSupported => isSingleTarget;
+  List<FoodOption> get cardDeck {
+    if (_preferences.mode != DrawMode.cards ||
+        !isCardFlowSupported ||
+        _dataUnavailable) {
+      return const [];
+    }
+    // An unstarted fan follows current eligibility, including midnight recovery.
+    // Once a flip starts, its scope stays frozen through replacement.
+    if (_cardDeck == null) {
+      _cardDeck = _shuffledDeck(_remainingCandidates());
+    } else if (!hasRound) {
+      _refreshUnstartedDeck();
+    }
+    return _cardDeck!;
+  }
+
+  int? get selectedCardIndex => _selectedCardIndex;
+  void refreshCardAvailability() {
+    if (_preferences.mode != DrawMode.cards || hasRound || isBusy) return;
+    cardDeck;
+    _notify();
+  }
+
+  FoodOption? get selectedCard =>
+      _selectedCardIndex == null ? null : _cardDeck![_selectedCardIndex!];
   List<FoodOption> get results => _results;
   int? get pendingReplacementIndex => _pendingReplacementIndex;
   int get availableCount => _remainingCandidates().length;
@@ -76,6 +106,7 @@ class MealController extends ChangeNotifier {
   bool get canDraw =>
       !isBusy &&
       !_dataUnavailable &&
+      (_preferences.mode != DrawMode.cards || isCardFlowSupported) &&
       !_isDrawing &&
       _operation == null &&
       (_pendingReplacementIndex != null || _results.length < requestedCount) &&
@@ -178,6 +209,8 @@ class MealController extends ChangeNotifier {
     }
     pool.shuffle(_random);
     _roundCandidates = List.unmodifiable(pool);
+    _cardDeck = _preferences.mode == DrawMode.cards ? _roundCandidates : null;
+    _selectedCardIndex = null;
     _pendingReplacementIndex = index;
     _chosen = null;
     _result = null;
@@ -314,6 +347,7 @@ class MealController extends ChangeNotifier {
   }
 
   bool startDraw() {
+    if (_preferences.mode == DrawMode.cards) return revealSelectedCard();
     if (isBusy ||
         _isDrawing ||
         _operation != null ||
@@ -339,6 +373,76 @@ class MealController extends ChangeNotifier {
     // Keep this spin's ordered pool until the next draw so its index stays valid.
     _roundCandidates = pool;
     _chosen = pool[_selectedIndex!];
+    _isDrawing = true;
+    _error = null;
+    _notify();
+    return true;
+  }
+
+  List<FoodOption> _shuffledDeck(List<FoodOption> pool) =>
+      List.unmodifiable(List<FoodOption>.of(pool)..shuffle(_random));
+
+  void _refreshUnstartedDeck() {
+    final eligible = _eligibleCandidates();
+    final eligibleIds = eligible.map((option) => option.id).toSet();
+    final oldIds = _cardDeck!.map((option) => option.id).toSet();
+    if (setEquals(oldIds, eligibleIds)) return;
+    final selectedId = selectedCard?.id;
+    final refreshed = _cardDeck!
+        .where((option) => eligibleIds.contains(option.id))
+        .toList();
+    // Preserve survivors' relative order and uniformly insert newly eligible cards.
+    for (final option in eligible.where(
+      (option) => !oldIds.contains(option.id),
+    )) {
+      refreshed.insert(_random.nextInt(refreshed.length + 1), option);
+    }
+    _cardDeck = List.unmodifiable(refreshed);
+    if (selectedId != null) {
+      final nextIndex = refreshed.indexWhere(
+        (option) => option.id == selectedId,
+      );
+      _selectedCardIndex = nextIndex < 0 ? null : nextIndex;
+      if (nextIndex < 0) {
+        _error = '这张牌已不符合当前条件，请重新选一张。';
+      }
+    }
+  }
+
+  bool selectCard(int index) {
+    if (_preferences.mode != DrawMode.cards || !canDraw) return false;
+    final deck = cardDeck;
+    if (index < 0 || index >= deck.length) return false;
+    _selectedCardIndex = index;
+    _error = null;
+    _notify();
+    return true;
+  }
+
+  bool cancelCardSelection() {
+    if (isBusy || _isDrawing || _result != null) return false;
+    _selectedCardIndex = null;
+    _notify();
+    return true;
+  }
+
+  bool revealSelectedCard() {
+    if (_preferences.mode != DrawMode.cards ||
+        !isCardFlowSupported ||
+        isBusy ||
+        _selectedCardIndex == null) {
+      return false;
+    }
+    final deck = cardDeck;
+    if (_selectedCardIndex == null) {
+      _notify();
+      return false;
+    }
+    if (!canDraw) return false;
+    _roundScope ??= deck;
+    _roundCandidates = deck;
+    _selectedIndex = _selectedCardIndex;
+    _chosen = deck[_selectedCardIndex!];
     _isDrawing = true;
     _error = null;
     _notify();
@@ -460,6 +564,7 @@ class MealController extends ChangeNotifier {
   }
 
   void _clearRound() {
+    _clearCardSelection();
     _roundCandidates = null;
     _roundScope = null;
     _chosen = null;
@@ -469,6 +574,32 @@ class MealController extends ChangeNotifier {
     _pendingReplacementIndex = null;
     _operation = null;
     _isDrawing = false;
+  }
+
+  void _clearCardSelection() {
+    _cardDeck = null;
+    _selectedCardIndex = null;
+  }
+
+  // The UI dismisses after a successful confirmation, or immediately on Skip.
+  // This independent write is allowed while a draw or confirmation is active.
+  Future<bool> dismissCardTutorial() {
+    if (_preferences.cardTutorialDismissed) return Future.value(true);
+    return _tutorialDismissal ??= _persistCardTutorialDismissal();
+  }
+
+  Future<bool> _persistCardTutorialDismissal() async {
+    try {
+      await _repository.dismissCardTutorial();
+      _preferences = _preferences.copyWith(cardTutorialDismissed: true);
+      return true;
+    } catch (_) {
+      _error = '引导状态暂时无法保存，请重试。';
+      return false;
+    } finally {
+      _tutorialDismissal = null;
+      _notify();
+    }
   }
 
   // Future controls restart a started round explicitly before changing conditions.
@@ -482,8 +613,16 @@ class MealController extends ChangeNotifier {
     _isUpdatingPreferences = true;
     _notify();
     try {
-      await _repository.savePreferences(preferences);
-      _preferences = preferences;
+      // Tutorial progress uses dismissCardTutorial, never a staged mode form.
+      await _repository.savePreferences(
+        preferences.copyWith(
+          cardTutorialDismissed: _preferences.cardTutorialDismissed,
+        ),
+      );
+      _preferences = preferences.copyWith(
+        cardTutorialDismissed: _preferences.cardTutorialDismissed,
+      );
+      _clearCardSelection();
       _error = null;
       return true;
     } catch (_) {
@@ -502,13 +641,14 @@ class MealController extends ChangeNotifier {
         !_options.any((option) => option.id == optionId)) {
       return false;
     }
-    _sessionExclusions.add(optionId);
+    if (_sessionExclusions.add(optionId)) _clearCardSelection();
     _notify();
     return true;
   }
 
   bool restoreSessionExclusions() {
     if (isBusy || hasRound) return false;
+    if (_sessionExclusions.isNotEmpty) _clearCardSelection();
     _sessionExclusions.clear();
     _error = null;
     _notify();
@@ -526,6 +666,8 @@ class MealController extends ChangeNotifier {
       if (hasRound) {
         _clearRound();
         _restartNotice = '选项或足迹已更新，这一轮已重置，请重新选择。';
+      } else {
+        _clearCardSelection();
       }
       try {
         final options = await _repository.options();

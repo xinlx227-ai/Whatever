@@ -451,6 +451,7 @@ void main() {
         excludeYesterday: true,
       );
       expect(await controller.updatePreferences(preference), isTrue);
+      expect(controller.selectCard(0), isTrue);
       expect(controller.startDraw(), isTrue);
       expect(
         await controller.updatePreferences(const MealPreferences()),

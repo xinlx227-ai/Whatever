@@ -38,9 +38,11 @@ void main() {
     MealPreferences actual, {
     DrawMode mode = DrawMode.wheel,
     bool excludeYesterday = false,
+    bool cardTutorialDismissed = false,
   }) {
     expect(actual.mode, mode);
     expect(actual.excludeYesterday, excludeYesterday);
+    expect(actual.cardTutorialDismissed, cardTutorialDismissed);
   }
 
   setUp(() async {
@@ -249,13 +251,114 @@ void main() {
       expect(history.option.periods, legacyOption.periods);
       final database = await inspect();
       try {
-        expect(await database.getVersion(), 5);
+        expect(await database.getVersion(), 6);
         expect(await database.query('history_records'), hasLength(1));
         expect(await database.query('history_items'), hasLength(1));
         expect(await database.rawQuery('PRAGMA foreign_key_check'), isEmpty);
       } finally {
         await database.close();
       }
+    },
+  );
+
+  test(
+    'v5 upgrade preserves preferences, edited identities and saved history',
+    () async {
+      final opened = await open();
+      await opened.savePreferences(
+        const MealPreferences(mode: DrawMode.cards, excludeYesterday: true),
+      );
+      final option = (await opened.options()).first;
+      await opened.confirm(
+        ConfirmationOperation(
+          operationId: 'v5-confirmed',
+          confirmedAt: DateTime(2026, 10, 9, 8),
+          period: option.periods.first,
+          option: option,
+        ),
+      );
+      await opened.close();
+      repository = null;
+      final legacy = await inspect();
+      try {
+        await legacy.execute(
+          'ALTER TABLE preferences DROP COLUMN card_tutorial_dismissed',
+        );
+        await legacy.setVersion(5);
+        await legacy.update(
+          'options',
+          {'name': '保留旧版编辑'},
+          where: 'id = ?',
+          whereArgs: [option.id],
+        );
+      } finally {
+        await legacy.close();
+      }
+      final upgraded = await open();
+      expectPreferences(
+        await upgraded.preferences(),
+        mode: DrawMode.cards,
+        excludeYesterday: true,
+      );
+      expect((await upgraded.history()).single.option.id, option.id);
+      expect((await upgraded.history()).single.option.name, '保留旧版编辑');
+      await upgraded.dismissCardTutorial();
+      await upgraded.savePreferences(const MealPreferences());
+      expectPreferences(
+        await (await reopen()).preferences(),
+        cardTutorialDismissed: true,
+      );
+    },
+  );
+
+  test(
+    'new default art follows category identity and remains stable after edits',
+    () async {
+      final opened = await open();
+      final categories = await opened.categories();
+      final hotpot = categories.firstWhere(
+        (category) => category.id == 'builtin-category-restaurant-0',
+      );
+      await opened.saveCategory(id: hotpot.id, name: '更名后的火锅');
+      final created = await opened.saveOption(
+        name: '自选火锅店',
+        periods: {MealPeriod.lunch},
+        scenario: MealScenario.restaurant.name,
+        category: '更名后的火锅',
+      );
+      expect(created.changed, isTrue);
+      expect(created.option!.art, 'shop-hotpot');
+      final edited = await opened.saveOption(
+        id: created.option!.id,
+        name: '自选火锅店',
+        periods: {MealPeriod.lunch},
+        scenario: MealScenario.restaurant.name,
+        category: '西餐',
+      );
+      expect(edited.option!.art, 'shop-hotpot');
+      final food = await opened.saveOption(
+        name: '自选面食',
+        periods: {MealPeriod.lunch},
+        category: '面食',
+      );
+      expect(food.option!.art, 'noodle');
+      final unknown = await opened.saveOption(
+        name: '自选未知菜',
+        periods: {MealPeriod.lunch},
+      );
+      expect(unknown.option!.art, 'plate');
+      final unknownShop = await opened.saveOption(
+        name: '自选未知店',
+        periods: {MealPeriod.lunch},
+        scenario: MealScenario.restaurant.name,
+      );
+      expect(unknownShop.option!.art, 'storefront');
+      expect(
+        (await (await reopen()).options())
+            .firstWhere((option) => option.id == created.option!.id)
+            .art,
+        'shop-hotpot',
+      );
     },
   );
 }

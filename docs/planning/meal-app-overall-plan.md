@@ -1,14 +1,16 @@
 # Meal app: product structure, page flows, and technical direction
 
-Updated: 2026-10-05, Asia/Shanghai.
+Updated: 2026-10-09, Asia/Shanghai.
 
 ## Status and authority
+
+Cards design continuation: the user approved the target-based interaction, visual/motion direction, and first-use guidance on 2026-10-09, and authorized S08 implementation in the next session. This session records decisions only. [S08 / Issue #9](https://github.com/xinlx227-ai/Whatever/issues/9) owns single-target Cards across all scenarios and single-result replacement; [S09 / Issue #10](https://github.com/xinlx227-ai/Whatever/issues/10) owns multi-target collection; [S10 / Issue #11](https://github.com/xinlx227-ai/Whatever/issues/11) owns multi-target slot replacement. Approval is not implementation or native validation evidence.
 
 Implementation continuation: S01 began on 2026-10-06 under [Issue #2](https://github.com/xinlx227-ai/Whatever/issues/2). Current build/test evidence lives in [S01 verification](../verification/s01-android.md); the proposed technical sections below retain their historical planning role.
 
 This is supporting planning context. The [product specification and vertical-slice map](https://github.com/xinlx227-ai/Whatever/issues/1) and its child issues are the formal scope, acceptance criteria, and dependency tracker. The [planning handoff](meal-app-handoff.md) preserves historical accepted behavior and superseded proposals. The user authorized issue publication and repository commit/push on 2026-10-05; this task does not start app implementation or adopt unresolved technical choices.
 
-Sections marked **accepted** summarize existing decisions. Sections marked **proposed** are recommendations for review or technical validation. Chinese UI strings are working copy. Keep technical recommendations separate from accepted product behavior.
+Sections marked **accepted** summarize existing decisions. Sections marked **proposed** are recommendations for review or technical validation. The Oct 9 single-target confirmation labels below are accepted; other Chinese strings remain working copy. Keep technical recommendations separate from accepted product behavior. Earlier content/framework readiness notes are historical; use the formal issues and delivered verification reports for current status.
 
 ## Product shape — accepted
 
@@ -47,10 +49,14 @@ Built-in food/dish edit forms allow display edits and show categories/periods re
 Keep the same positions for scenario, period, filters, mode, and bottom navigation in both visual themes. Put the cooking count below category filters and above the draw surface. Names remain fully readable in the result area even if wheel labels are omitted for a large pool.
 
 - Wheel: bright playful atmosphere, explicit start control, current progress, and results with replacement access.
-- Cards: preserved black-purple-gold card back; horizontally browsable overlapping fan at the top; central reveal/detail area; horizontally scrolling small result cards below. The face contains a name and illustration, without a category label.
-- Confirmation: one action based on actual revealed results, available before reaching the requested cooking count. An uncollected but revealed central card is already a result. Collecting it is presentation, not persistence.
+- Cards: preserve the exact canonical [black-purple-gold card back](../design/assets/card-back-celestial-black-purple-gold.png), with a horizontally browsable overlapping fan above the central reveal/detail area. The face uses dark purple, a fine gold border, light name text, and a warm light illustration region; show the complete name and illustration without a category label.
+- Single-target Cards: the revealed result remains central with direct confirmation and Replace (换一个), without collection interaction or a bottom result row. Use “就吃这个,” “就做这 1 道菜,” or “就去这家” for confirmation.
+- Multi-target Cards: tapping the central revealed card collects it into one horizontally scrolling row of small result cards; tapping a small card reopens that result. This branch remains active even with only one revealed result or early confirmation. Collecting/reopening is presentation, not persistence or another draw.
+- Confirmation: one action based on actual revealed results, available before reaching the requested cooking count. An uncollected but revealed central card is already a result. Choose the single/multi interaction by the round's target/requested count, never by revealed count or implementation phase.
 
-Proposed layout checks: keep confirmation above system/bottom-navigation insets, leave room for enlarged Chinese text, expose clear selected-card and pending-replacement feedback, and make horizontal card browsing distinguishable from card taps. Preserve the accepted horizontal fan and result row. Reduced-motion presentation should preserve the same selection and confirmation steps.
+Accepted layout and motion direction: allow vertical page scrolling on small screens while preserving the large card, readable full name, and usable touch areas; keep confirmation above bottom navigation. Horizontal fan scrolling only browses and preserves selected-card identity even off-screen; it does not reveal, cancel, or reshuffle. Selection takes approximately 0.2 seconds, reveal movement/enlargement/flip 0.7–0.9 seconds, and multi-target collection 0.3 seconds. Use light haptic feedback, no sound, and reduced motion that preserves the manual steps. Validate enlarged Chinese text, safe areas, tap/scroll separation, and pending-replacement feedback on-device.
+
+S08 retains current food drawings and fills missing generic plate/storefront and dining-type shop illustrations; the user delegated their design to the implementation agent. User-selected images take priority, with stable automatic defaults when none are selected. The [handoff's card-face rules](meal-app-handoff.md#card-face-content) retain the image-selection behavior and fallback assignments.
 
 ## Main flows
 
@@ -80,7 +86,9 @@ flowchart TD
 
 First installation starts in Wheel; later launches restore the last mode and yesterday-filter selection. Fresh launch resets cooking count to one and clears session exclusions and unfinished results. Returning to an app that remains running preserves its current state.
 
-In Cards, first tap selects; second tap reveals; tapping the revealed card collects it. Tapping a collected result reopens that same result. Neither reopening nor collecting consumes another slot. In Wheel, every result requires a separate start press.
+In Cards, first tap selects and second tap reveals. For target one, keep the revealed card central for confirmation or replacement. For target above one, tapping the revealed card collects it and tapping a collected card reopens that same result; neither consumes another slot. In Wheel, every result requires a separate start press.
+
+First-use Cards guidance accompanies real actions rather than a separate demo: browse/select, second tap to reveal, then confirm or replace in a single-target round. Offer Skip. Completing or skipping suppresses future automatic tutorial runs; afterward use brief contextual hints. The single-target tutorial teaches no collection step.
 
 ### Replacement — accepted
 
@@ -88,7 +96,9 @@ In Cards, first tap selects; second tap reveals; tapping the revealed card colle
 2. Choose Redraw (重新抽) or Exclude it (排除它). Before mutating state, check that an alternative exists after excluding other batch results. If none exists, explain and preserve the outgoing result; Back dismisses the prompt.
 3. Redraw returns the outgoing option to the pool, so it may recur. Exclude it adds the outgoing identity to session exclusions. Both reshuffle.
 4. Keep the original result slot pending. Cards requires the user to select and reveal a replacement; Wheel requires another start press. Neither starts automatically.
-5. Fill that same slot. During the pending interval, block another replacement, additional dishes, and meal confirmation. There is no cancellation/undo after replacement begins; accepted whole-round resets remain available.
+5. Fill that same slot. A single-target Cards replacement remains central with direct actions; a multi-target replacement can be collected back into its original bottom-row position. During the pending interval, block another replacement, additional dishes, and meal confirmation. There is no cancellation/undo after replacement begins; accepted whole-round resets remain available.
+
+These preflight, no-alternative, session-exclusion, and pending safeguards apply to S08 single-result replacement as well as later multi-target replacement. S08 staging integration must preserve the requested count; hiding cooking counts or forcing a single target on mode switching was not approved. Resolve the implementation boundary without silently mutating the target or using the single-target layout for multi-target rounds.
 
 ### Add or rename an option — accepted behavior, proposed orchestration
 
@@ -171,9 +181,9 @@ Zero observed false blocks in a finite set is a gate for that set, not proof of 
 
 ## Recommended planning sequence
 
-1. Review this product/page synthesis and provisional technical recommendation together. Resolve material contradictions as a batch; accepted boundaries remain closed.
-2. Reconcile the What to eat content list into one inventory review. Derive wireframes for the two Decide modes and the library/history forms, preserving the selected card back.
-3. Once technical prototyping is requested, validate the highest-risk vertical slice: large card fan, one replacement, atomic history save/retry, and Chinese recognition examples. Existing browser artwork exploration is not evidence of native feasibility.
-4. Use the findings to adopt a stack/provider and record measurable acceptance criteria in the relevant GitHub slices. The specification and vertical slices have been published; keep these planning notes as supporting context rather than a second live issue tracker.
+1. In the next implementation session, read current Issue #1, Issue #9, and blocking-issue evidence; use the Oct 9 accepted Cards direction and the existing round/save contracts.
+2. Implement and verify S08 single-target reveal, confirmation, replacement, tutorial, and illustration work without assigning multi-target behavior to the single-target layout. Resolve the staging integration choice while preserving requested count.
+3. Keep S09 multi-target collection and S10 multi-target slot replacement in their formal slices. Their permanent interaction depends on target count, including partially revealed and early-confirmed rounds.
+4. Record implementation and on-device validation evidence in the relevant slice. Browser artwork exploration and this design approval do not establish native feasibility. Keep these notes as supporting context rather than a second live issue tracker.
 
-Open decisions are concentrated in framework/tooling, recognition evidence and operating cost, complete What to eat content, and detailed visual/copy/animation work. They do not require revisiting the accepted three scenarios, two draw modes, navigation, replacement rules, or history semantics.
+S08 remaining work is engineering integration, artwork creation, final on-device sizing/motion/accessibility validation, and any unapproved copy detail. The target-based branches, manual steps, selected card back, tutorial direction, and single-target replacement scope are accepted. Use formal issues for current status of broader framework/content/recognition work.
