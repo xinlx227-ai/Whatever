@@ -29,7 +29,7 @@ class MealRepository {
     final database = await factory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-        version: 6,
+        version: 7,
         onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
         onCreate: (database, version) async {
           await database.execute('''
@@ -67,6 +67,7 @@ class MealRepository {
           await _addScenarioMetadata(database);
           await _addCategoryRegistry(database);
           await _addCardTutorialPreference(database);
+          await _addCardCollectionTutorialPreference(database);
         },
         onUpgrade: (database, oldVersion, newVersion) async {
           if (oldVersion < 2) {
@@ -83,6 +84,9 @@ class MealRepository {
           }
           if (oldVersion < 6) {
             await _addCardTutorialPreference(database);
+          }
+          if (oldVersion < 7) {
+            await _addCardCollectionTutorialPreference(database);
           }
         },
       ),
@@ -256,6 +260,8 @@ class MealRepository {
       mode: DrawMode.values.byName(row['mode']! as String),
       excludeYesterday: row['exclude_yesterday'] == 1,
       cardTutorialDismissed: row['card_tutorial_dismissed'] == 1,
+      cardCollectionTutorialDismissed:
+          row['card_collection_tutorial_dismissed'] == 1,
     );
   }
 
@@ -265,10 +271,21 @@ class MealRepository {
       INTEGER NOT NULL DEFAULT 0 CHECK (card_tutorial_dismissed IN (0, 1))
   ''');
 
-  Future<void> dismissCardTutorial() async {
+  static Future<void> _addCardCollectionTutorialPreference(
+    DatabaseExecutor database,
+  ) => database.execute('''
+    ALTER TABLE preferences ADD COLUMN card_collection_tutorial_dismissed
+      INTEGER NOT NULL DEFAULT 0
+      CHECK (card_collection_tutorial_dismissed IN (0, 1))
+  ''');
+
+  Future<void> dismissCardTutorial({bool includeCollection = false}) async {
     await _database.update(
       'preferences',
-      {'card_tutorial_dismissed': 1},
+      {
+        'card_tutorial_dismissed': 1,
+        if (includeCollection) 'card_collection_tutorial_dismissed': 1,
+      },
       where: 'id = ?',
       whereArgs: [1],
     );
@@ -286,6 +303,11 @@ class MealRepository {
       'card_tutorial_dismissed':
           preferences.cardTutorialDismissed ||
               existing['card_tutorial_dismissed'] == 1
+          ? 1
+          : 0,
+      'card_collection_tutorial_dismissed':
+          preferences.cardCollectionTutorialDismissed ||
+              existing['card_collection_tutorial_dismissed'] == 1
           ? 1
           : 0,
     }, conflictAlgorithm: ConflictAlgorithm.replace);

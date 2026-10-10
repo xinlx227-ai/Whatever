@@ -4,6 +4,11 @@ Updated: 2026-10-09, Asia/Shanghai.
 
 ## Status and authority
 
+The 2026-10-10 confirmed redesign is implemented locally on `codex/first-restore`.
+See [current behavior and verification](../verification/first-restore.md) for the
+accepted overrides to the historical layouts and replacement rules below.
+Formal issue edits and delivery have not been performed for this local work.
+
 Cards design continuation: the user approved the target-based interaction, visual/motion direction, and first-use guidance on 2026-10-09, and authorized S08 implementation in the next session. This session records decisions only. [S08 / Issue #9](https://github.com/xinlx227-ai/Whatever/issues/9) owns single-target Cards across all scenarios and single-result replacement; [S09 / Issue #10](https://github.com/xinlx227-ai/Whatever/issues/10) owns multi-target collection; [S10 / Issue #11](https://github.com/xinlx227-ai/Whatever/issues/11) owns multi-target slot replacement. Approval is not implementation or native validation evidence.
 
 Implementation continuation: S01 began on 2026-10-06 under [Issue #2](https://github.com/xinlx227-ai/Whatever/issues/2). Current build/test evidence lives in [S01 verification](../verification/s01-android.md); the proposed technical sections below retain their historical planning role.

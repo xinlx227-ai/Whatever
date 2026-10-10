@@ -46,9 +46,9 @@ void main() {
       Future<void> idle() async {
         final deadline = DateTime.now().add(const Duration(seconds: 15));
         while (controller.isBusy) {
-        if (DateTime.now().isAfter(deadline)) {
-          throw StateError('Persistence timed out');
-        }
+          if (DateTime.now().isAfter(deadline)) {
+            throw StateError('Persistence timed out');
+          }
           await tester.pump(const Duration(milliseconds: 100));
         }
         await tester.pumpAndSettle();
@@ -67,24 +67,27 @@ void main() {
       await tap(key('draw-mode-cards'));
       await idle();
       expect(controller.preferences.mode, DrawMode.cards);
+      await tap(key('primary-action'));
+      expect(key('draw-stage'), findsOneWidget);
+      expect(find.byType(NavigationBar), findsNothing);
+      expect(key('draw-mode-wheel'), findsNothing);
       await tap(key('candidate-card-0'));
       final selection = controller.selectedCard!.id;
-      await tap(find.text('选项库'));
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
+      expect(find.text('离开本次抽取？'), findsOneWidget);
+      await tap(find.text('继续抽取'));
       expect(controller.selectedCard!.id, selection);
       expect(controller.hasRound, isFalse);
       await tap(key('candidate-card-0'));
       expect(controller.result!.id, selection);
-      await tap(key('draw-mode-wheel'));
+      expect(key('draw-mode-wheel'), findsNothing);
       expect(controller.preferences.mode, DrawMode.cards);
       expect(controller.result!.id, selection);
-      // Locked mode feedback is non-destructive and does not need confirmation.
-      await tester.pumpAndSettle();
       await tap(key('replace-result-0'));
       await tap(key('replacement-exclude'));
       expect(controller.sessionExclusions, contains(selection));
-      expect(controller.pendingReplacementIndex, 0);
+      expect(controller.hasPendingReplacement, isTrue);
       expect(controller.isDrawing, isFalse);
       await reveal();
       final replacement = controller.result!.id;
@@ -102,6 +105,7 @@ void main() {
       expect(await repository.history(), hasLength(1));
       for (final scenario in [MealScenario.cook, MealScenario.restaurant]) {
         await tap(key('decide-scenario-${scenario.name}'));
+        await tap(key('primary-action'));
         await reveal();
         await tap(key('primary-action'));
         await idle();

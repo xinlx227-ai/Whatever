@@ -39,10 +39,15 @@ void main() {
     DrawMode mode = DrawMode.wheel,
     bool excludeYesterday = false,
     bool cardTutorialDismissed = false,
+    bool cardCollectionTutorialDismissed = false,
   }) {
     expect(actual.mode, mode);
     expect(actual.excludeYesterday, excludeYesterday);
     expect(actual.cardTutorialDismissed, cardTutorialDismissed);
+    expect(
+      actual.cardCollectionTutorialDismissed,
+      cardCollectionTutorialDismissed,
+    );
   }
 
   setUp(() async {
@@ -251,7 +256,7 @@ void main() {
       expect(history.option.periods, legacyOption.periods);
       final database = await inspect();
       try {
-        expect(await database.getVersion(), 6);
+        expect(await database.getVersion(), 7);
         expect(await database.query('history_records'), hasLength(1));
         expect(await database.query('history_items'), hasLength(1));
         expect(await database.rawQuery('PRAGMA foreign_key_check'), isEmpty);
@@ -282,6 +287,9 @@ void main() {
       final legacy = await inspect();
       try {
         await legacy.execute(
+          'ALTER TABLE preferences DROP COLUMN card_collection_tutorial_dismissed',
+        );
+        await legacy.execute(
           'ALTER TABLE preferences DROP COLUMN card_tutorial_dismissed',
         );
         await legacy.setVersion(5);
@@ -310,6 +318,99 @@ void main() {
       );
     },
   );
+
+  for (final baseDismissed in [false, true]) {
+    test(
+      'v6 migration preserves base tutorial=$baseDismissed and all saved data',
+      () async {
+        final opened = await open();
+        await opened.savePreferences(
+          MealPreferences(
+            mode: DrawMode.cards,
+            excludeYesterday: true,
+            cardTutorialDismissed: baseDismissed,
+          ),
+        );
+        final changed = await opened.saveOption(
+          name: '保留自选菜品',
+          scenario: 'cook',
+          periods: {MealPeriod.lunch},
+        );
+        final existingDish = (await opened.options()).firstWhere(
+          (option) =>
+              option.scenario == MealScenario.cook.name &&
+              option.id != changed.option!.id &&
+              option.periods.contains(MealPeriod.lunch),
+        );
+        await opened.confirm(
+          ConfirmationOperation(
+            operationId: 'v6-saved-meal',
+            confirmedAt: DateTime(2026, 10, 10, 12),
+            period: MealPeriod.lunch,
+            options: [existingDish, changed.option!],
+          ),
+        );
+        await opened.close();
+        repository = null;
+        final before = <String, List<Map<String, Object?>>>{};
+        final legacy = await inspect();
+        try {
+          for (final table in [
+            'options',
+            'option_periods',
+            'option_categories',
+            'categories',
+            'history_records',
+            'history_items',
+          ]) {
+            before[table] = await legacy.query(table, orderBy: 'rowid');
+          }
+          await legacy.execute(
+            'ALTER TABLE preferences DROP COLUMN card_collection_tutorial_dismissed',
+          );
+          await legacy.setVersion(6);
+        } finally {
+          await legacy.close();
+        }
+        final upgraded = await open();
+        expectPreferences(
+          await upgraded.preferences(),
+          mode: DrawMode.cards,
+          excludeYesterday: true,
+          cardTutorialDismissed: baseDismissed,
+        );
+        final database = await inspect();
+        try {
+          expect(await database.getVersion(), 7);
+          for (final entry in before.entries) {
+            expect(
+              await database.query(entry.key, orderBy: 'rowid'),
+              entry.value,
+            );
+          }
+          expect(await database.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+        } finally {
+          await database.close();
+        }
+        final stale = await upgraded.preferences();
+        await upgraded.dismissCardTutorial();
+        expect(
+          (await upgraded.preferences()).cardCollectionTutorialDismissed,
+          isFalse,
+        );
+        await Future.wait([
+          upgraded.dismissCardTutorial(includeCollection: true),
+          upgraded.savePreferences(stale),
+        ]);
+        await upgraded.savePreferences(const MealPreferences());
+        expectPreferences(
+          await (await reopen()).preferences(),
+          cardTutorialDismissed: true,
+          cardCollectionTutorialDismissed: true,
+        );
+      },
+    );
+  }
 
   test(
     'new default art follows category identity and remains stable after edits',

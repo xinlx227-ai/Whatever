@@ -167,14 +167,14 @@ void main() {
 
   for (final choice in ReplacementChoice.values) {
     test(
-      '$choice reshuffles then replaces the same slot after explicit reveal',
+      '$choice removes the result and reshuffles before explicit reveal',
       () async {
         final outgoing = reveal(0);
         final oldDeck = controller.cardDeck;
         expect(controller.beginReplacement(0, choice), isTrue);
-        expect(controller.results.single, same(outgoing));
+        expect(controller.results, isEmpty);
         expect(controller.result, isNull);
-        expect(controller.pendingReplacementIndex, 0);
+        expect(controller.hasPendingReplacement, isTrue);
         expect(controller.selectedCard, isNull);
         expect(controller.cardDeck, isNot(same(oldDeck)));
         expect(controller.isDrawing, isFalse);
@@ -193,7 +193,7 @@ void main() {
             : controller.cardDeck.length - 1;
         final replacement = reveal(index);
         expect(controller.results.single, same(replacement));
-        expect(controller.pendingReplacementIndex, isNull);
+        expect(controller.hasPendingReplacement, isFalse);
         expect(await controller.confirm(), isTrue);
         expect(controller.history.single.option.id, replacement.id);
         if (choice == ReplacementChoice.exclude) {
@@ -224,28 +224,23 @@ void main() {
   });
 
   test(
-    'multi-target classification preserves requested count and Wheel flow',
+    'multi-target Cards preserves requested count and supports early confirmation',
     () async {
       controller.changeScenario(MealScenario.cook);
       controller.changeCookingCount(3);
       expect(controller.requestedCount, 3);
       expect(controller.isSingleTarget, isFalse);
-      expect(controller.isCardFlowSupported, isFalse);
-      expect(controller.cardDeck, isEmpty);
-      expect(controller.selectCard(0), isFalse);
-      expect(controller.startDraw(), isFalse);
-      expect(controller.canDraw, isFalse);
-      expect(
-        await controller.updatePreferences(const MealPreferences()),
-        isTrue,
-      );
-      expect(controller.requestedCount, 3);
-      expect(controller.startDraw(), isTrue);
-      controller.finishDraw();
+      expect(controller.isCardFlowSupported, isTrue);
+      expect(controller.cardDeck, isNotEmpty);
+      reveal(0);
       expect(controller.results, hasLength(1));
       expect(controller.isSingleTarget, isFalse);
-      expect(controller.canDraw, isTrue);
+      expect(controller.canDraw, isFalse);
       expect(controller.canConfirm, isTrue);
+      expect(controller.collectedResults, isEmpty);
+      expect(await controller.confirm(), isTrue);
+      expect(controller.history.single.options, hasLength(1));
+      expect(controller.requestedCount, 3);
     },
   );
 
@@ -307,7 +302,7 @@ void main() {
       controller.selectCard(0);
       controller.changeCookingCount(2);
       expect(controller.selectedCard, isNull);
-      expect(controller.cardDeck, isEmpty);
+      expect(controller.cardDeck, isNotEmpty);
     },
   );
 
@@ -336,6 +331,7 @@ void main() {
       await createController();
       expect(controller.preferences.mode, DrawMode.cards);
       expect(controller.preferences.cardTutorialDismissed, isTrue);
+      expect(controller.preferences.cardCollectionTutorialDismissed, isFalse);
       expect(controller.hasRound, isFalse);
       expect(controller.selectedCard, isNull);
     },
@@ -461,7 +457,10 @@ void main() {
       final saving = controller.confirm();
       await entered.future;
       expect(controller.isSaving, isTrue);
-      expect(await controller.dismissCardTutorial(), isTrue);
+      expect(
+        await controller.dismissCardTutorial(includeCollection: true),
+        isTrue,
+      );
       expect(controller.results.single, same(chosen));
       expect(controller.hasRound, isTrue);
       release.complete();
@@ -471,7 +470,94 @@ void main() {
         isTrue,
       );
       expect(controller.preferences.cardTutorialDismissed, isTrue);
+      expect(controller.preferences.cardCollectionTutorialDismissed, isTrue);
       expect((await repository.preferences()).cardTutorialDismissed, isTrue);
+      expect(
+        (await repository.preferences()).cardCollectionTutorialDismissed,
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'completed single tutorial still allows independent collection guidance',
+    () async {
+      expect(await controller.dismissCardTutorial(), isTrue);
+      expect(controller.preferences.cardTutorialDismissed, isTrue);
+      expect(controller.preferences.cardCollectionTutorialDismissed, isFalse);
+      controller.changeScenario(MealScenario.cook);
+      controller.changeCookingCount(3);
+      final selected = reveal(0);
+      expect(
+        await controller.dismissCardTutorial(includeCollection: true),
+        isTrue,
+      );
+      expect(controller.preferences.cardCollectionTutorialDismissed, isTrue);
+      expect(controller.result, same(selected));
+      expect(controller.results.single, same(selected));
+      expect(controller.collectedResults, isEmpty);
+      controller.dispose();
+      await createController();
+      expect(controller.preferences.cardTutorialDismissed, isTrue);
+      expect(controller.preferences.cardCollectionTutorialDismissed, isTrue);
+    },
+  );
+
+  test(
+    'collection tutorial failure retains base completion and retries',
+    () async {
+      expect(await controller.dismissCardTutorial(), isTrue);
+      final selected = reveal(0);
+      final database = await databaseFactoryFfi.openDatabase(
+        '${directory.path}/meal.sqlite',
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      try {
+        await database.execute('''
+        CREATE TRIGGER fail_collection_tutorial BEFORE UPDATE ON preferences
+        WHEN NEW.card_collection_tutorial_dismissed = 1
+        BEGIN SELECT RAISE(ABORT, 'Injected collection tutorial failure'); END
+      ''');
+        expect(
+          await controller.dismissCardTutorial(includeCollection: true),
+          isFalse,
+        );
+        expect(controller.preferences.cardTutorialDismissed, isTrue);
+        expect(controller.preferences.cardCollectionTutorialDismissed, isFalse);
+        expect(controller.result, same(selected));
+        expect(controller.canConfirm, isTrue);
+        await database.execute('DROP TRIGGER fail_collection_tutorial');
+        expect(
+          await controller.dismissCardTutorial(includeCollection: true),
+          isTrue,
+        );
+        expect(controller.preferences.cardCollectionTutorialDismissed, isTrue);
+      } finally {
+        await database.close();
+      }
+    },
+  );
+
+  test(
+    'concurrent base and collection dismissal preserve stronger request',
+    () async {
+      final base = controller.dismissCardTutorial();
+      final collection = controller.dismissCardTutorial(
+        includeCollection: true,
+      );
+      final preferences = controller.updatePreferences(const MealPreferences());
+      expect(await Future.wait([base, collection, preferences]), [
+        true,
+        true,
+        true,
+      ]);
+      expect(controller.preferences.mode, DrawMode.wheel);
+      expect(controller.preferences.cardTutorialDismissed, isTrue);
+      expect(controller.preferences.cardCollectionTutorialDismissed, isTrue);
+      final saved = await repository.preferences();
+      expect(saved.mode, DrawMode.wheel);
+      expect(saved.cardTutorialDismissed, isTrue);
+      expect(saved.cardCollectionTutorialDismissed, isTrue);
     },
   );
 }

@@ -128,7 +128,8 @@ void main() {
       await tester.tap(primary);
       await tester.tap(primary);
       await tester.pump();
-      expect(tester.widget<FilledButton>(primary).onPressed, isNull);
+      expect(find.byKey(const Key('draw-stage')), findsOneWidget);
+      expect(primary, findsNothing);
       expect(result, findsNothing);
       await tester.pump(const Duration(milliseconds: 3500));
       expect(result, findsNothing);
@@ -233,83 +234,63 @@ void main() {
     },
   );
 
-  testWidgets('library and history browsing preserve an unconfirmed result', (
+  testWidgets('full-screen draw hides tabs and settings until explicit leave', (
     tester,
   ) async {
     await mount(tester);
     final selected = await draw(tester);
+    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.byKey(const Key('category-filter-button')), findsNothing);
+    expect(find.byKey(const Key('draw-mode-cards')), findsNothing);
+    await tester.tap(find.byKey(const Key('draw-back')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('继续抽取'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(result).data, selected);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('离开'));
+    await tester.pumpAndSettle();
+    expect(controller.hasRound, isFalse);
+    expect(find.byType(NavigationBar), findsOneWidget);
     await tab(tester, '选项库');
-    for (final name in [
-      '黄焖鸡米饭',
-      '牛肉面',
-      '小笼包',
-      '煎饼果子',
-      '皮蛋瘦肉粥',
-      '汉堡套餐',
-      '豆浆',
-      '豆奶',
-    ]) {
-      expect(find.text(name), findsOneWidget);
-    }
+    expect(find.text('豆奶'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
     await tab(tester, '足迹');
     expect(find.text('第一餐，值得期待'), findsOneWidget);
-    await tab(tester, '决定');
-    expect(tester.widget<Text>(result).data, selected);
-    expect(find.text('就吃这个'), findsOneWidget);
-    await expectStored(tester, 0);
-  });
-
-  testWidgets('period restart can be canceled or accepted without saving', (
-    tester,
-  ) async {
-    await mount(tester);
-    final selected = await draw(tester);
-    final dinner = find.widgetWithText(ChoiceChip, '晚餐');
-    await tester.ensureVisible(dinner);
-    await tester.tap(dinner);
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('换个餐段？'), findsOneWidget);
-    await tester.tap(find.text('继续这一餐'));
-    await tester.pumpAndSettle();
-    expect(controller.period, MealPeriod.lunch);
-    expect(tester.widget<Text>(result).data, selected);
-    expect(tester.widget<ChoiceChip>(dinner).selected, isFalse);
-
-    await tester.tap(dinner);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('切换并重新开始'));
-    await tester.pumpAndSettle();
-    expect(tester.widget<ChoiceChip>(dinner).selected, isTrue);
-    expect(result, findsNothing);
-    expect(find.text('晚餐 · 吃什么'), findsOneWidget);
-    expect(find.text('转一下，开饭'), findsOneWidget);
+    expect(primary, findsOneWidget);
     await expectStored(tester, 0);
   });
 
   testWidgets(
-    'Android Back returns from tabs before offering round abandonment',
+    'restart keeps entry settings and waits for another manual draw',
     (tester) async {
       await mount(tester);
       final selected = await draw(tester);
-      for (final label in ['选项库', '足迹']) {
-        await tab(tester, label);
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
-        expect(tester.widget<Text>(result).data, selected);
-        expect(find.byType(AlertDialog), findsNothing);
-      }
-      await tester.binding.handlePopRoute();
+      expect(find.widgetWithText(ChoiceChip, '晚餐'), findsNothing);
+      await tester.tap(find.byKey(const Key('restart-round')));
       await tester.pumpAndSettle();
-      expect(find.text('先放下这一餐？'), findsOneWidget);
-      await tester.tap(find.text('继续这一餐'));
+      await tester.tap(find.text('继续抽取'));
       await tester.pumpAndSettle();
       expect(tester.widget<Text>(result).data, selected);
-      await tester.binding.handlePopRoute();
+      await tester.tap(find.byKey(const Key('restart-round')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('放弃这次选择'));
+      await tester.tap(find.text('清空并重新开始'));
       await tester.pumpAndSettle();
+      expect(controller.period, MealPeriod.lunch);
+      expect(controller.hasRound, isFalse);
+      expect(find.byKey(const Key('draw-stage')), findsNothing);
+      final dinner = find.widgetWithText(ChoiceChip, '晚餐');
+      await tester.ensureVisible(dinner);
+      await tester.tap(dinner);
+      await tester.pumpAndSettle();
+      expect(controller.period, MealPeriod.dinner);
+      expect(find.byType(AlertDialog), findsNothing);
       expect(result, findsNothing);
-      expect(find.text('转一下，开饭'), findsOneWidget);
       await expectStored(tester, 0);
     },
   );
@@ -322,7 +303,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await tester.binding.handlePopRoute();
     await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.text('放弃这次选择'));
+    await tester.tap(find.text('离开'));
     await tester.pumpAndSettle();
     await tester.pump(const Duration(seconds: 5));
     expect(result, findsNothing);
@@ -368,30 +349,22 @@ void main() {
     },
   );
 
-  testWidgets(
-    'data changes cancel active animation and explain reset on tab return',
-    (tester) async {
-      await mount(tester);
-      await tapPrimary(tester);
-      await tester.pump(const Duration(milliseconds: 500));
-      await tester.tap(find.text('选项库'));
-      await tester.pump();
-      expect(controller.isDrawing, isTrue);
-      await tester.runAsync(() => controller.applyDataChange(changed: true));
-      await tester.pumpAndSettle();
-      expect(find.text('选项或足迹已更新，这一轮已重置，请重新选择。'), findsNothing);
-      await tester.binding.handlePopRoute();
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('选项或足迹已更新，这一轮已重置，请重新选择。'), findsOneWidget);
-      expect(result, findsNothing);
-      expect(find.text('转一下，开饭'), findsOneWidget);
-      await tester.pumpAndSettle();
-      await tester.pump(const Duration(seconds: 5));
-      expect(result, findsNothing);
-      await expectStored(tester, 0);
-    },
-  );
+  testWidgets('saved library changes cancel an active full-screen draw', (
+    tester,
+  ) async {
+    await mount(tester);
+    await tapPrimary(tester);
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('选项库'), findsNothing);
+    await tester.runAsync(() => controller.applyDataChange(changed: true));
+    await tester.pumpAndSettle();
+    expect(find.text('选项或足迹已更新，这一轮已重置，请重新选择。'), findsOneWidget);
+    expect(find.byKey(const Key('draw-stage')), findsNothing);
+    expect(result, findsNothing);
+    await tester.pump(const Duration(seconds: 5));
+    expect(result, findsNothing);
+    await expectStored(tester, 0);
+  });
 
   testWidgets(
     'system reduced motion reveals promptly with the same save flow',
@@ -417,43 +390,38 @@ void main() {
     },
   );
 
-  testWidgets(
-    'phone reveal and tab return keep result and confirmation fully visible',
-    (tester) async {
-      await mount(tester);
-      tester.view.physicalSize = const Size(393, 851);
-      tester.view.padding = FakeViewPadding(top: 24, bottom: 24);
-      tester.view.viewPadding = FakeViewPadding(top: 24, bottom: 24);
-      addTearDown(tester.view.resetPadding);
-      addTearDown(tester.view.resetViewPadding);
-      await tester.pumpAndSettle();
-
-      void expectCompletionVisible() {
-        final navigationTop = tester.getRect(find.byType(NavigationBar)).top;
-        for (final target in [result, primary]) {
-          final bounds = tester.getRect(target);
-          expect(bounds.top, greaterThanOrEqualTo(24));
-          expect(bounds.bottom, lessThanOrEqualTo(navigationTop));
-          expect(bounds.left, greaterThanOrEqualTo(0));
-          expect(bounds.right, lessThanOrEqualTo(393));
-          expect(target.hitTestable(), findsOneWidget);
-        }
+  testWidgets('phone reveal and resume keep result and confirmation visible', (
+    tester,
+  ) async {
+    await mount(tester);
+    tester.view.physicalSize = const Size(393, 851);
+    tester.view.padding = FakeViewPadding(top: 24, bottom: 24);
+    tester.view.viewPadding = FakeViewPadding(top: 24, bottom: 24);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
+    await tester.pumpAndSettle();
+    final selected = await draw(tester);
+    void expectCompletionVisible() {
+      for (final target in [result, primary]) {
+        final bounds = tester.getRect(target);
+        expect(bounds.top, greaterThanOrEqualTo(24));
+        expect(bounds.bottom, lessThanOrEqualTo(827));
+        expect(bounds.left, greaterThanOrEqualTo(0));
+        expect(bounds.right, lessThanOrEqualTo(393));
+        expect(target.hitTestable(), findsOneWidget);
       }
+    }
 
-      // Only scroll before starting: result reveal must expose confirmation
-      // without another scroll gesture from the user or the test.
-      final selected = await draw(tester);
-      expectCompletionVisible();
-      for (final destination in ['选项库', '足迹']) {
-        await tab(tester, destination);
-        await tab(tester, '决定');
-        expect(tester.widget<Text>(result).data, selected);
-        expectCompletionVisible();
-      }
-      await expectStored(tester, 0);
-      expect(tester.takeException(), isNull);
-    },
-  );
+    expectCompletionVisible();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('继续抽取'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(result).data, selected);
+    expectCompletionVisible();
+    await expectStored(tester, 0);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final size in [const Size(375, 812), const Size(812, 375)]) {
     testWidgets(
@@ -470,16 +438,10 @@ void main() {
         await tester.ensureVisible(result);
         await tester.pumpAndSettle();
         expect(result.hitTestable(), findsOneWidget);
-        await tab(tester, '选项库');
-        await tester.ensureVisible(find.text('豆奶'));
+        expect(find.byType(NavigationBar), findsNothing);
+        await tester.tap(find.byKey(const Key('draw-back')));
         await tester.pumpAndSettle();
-        expect(find.text('豆奶').hitTestable(), findsOneWidget);
-        expect(tester.takeException(), isNull);
-        await tab(tester, '足迹');
-        final decide = find.widgetWithText(FilledButton, '去决定这一餐');
-        await tester.ensureVisible(decide);
-        await tester.pumpAndSettle();
-        await tester.tap(decide);
+        await tester.tap(find.text('继续抽取'));
         await tester.pumpAndSettle();
         expect(tester.widget<Text>(result).data, selected);
         await tapPrimary(tester);

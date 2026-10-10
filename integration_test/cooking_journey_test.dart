@@ -76,8 +76,10 @@ void main() {
       final firstMeal = controller.results.map((item) => item.id).toList();
       expect(firstMeal.toSet(), hasLength(2));
       expect(find.text('就做这 2 道菜'), findsOneWidget);
-      await tap(key('cooking-count-2'));
-      await tap(find.text('继续这一餐'));
+      expect(key('cooking-count-2'), findsNothing);
+      expect(find.byType(NavigationBar), findsNothing);
+      await tap(key('restart-round'));
+      await tap(find.text('继续抽取'));
       expect(controller.cookingCount, 3);
       expect(controller.results.map((item) => item.id), firstMeal);
 

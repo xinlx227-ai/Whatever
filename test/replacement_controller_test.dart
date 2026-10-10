@@ -110,7 +110,7 @@ void main() {
   for (final count in [2, 3]) {
     for (final choice in ReplacementChoice.values) {
       test(
-        '$choice fills the original slot in a ${count == 2 ? 'full' : 'partial'} batch',
+        '$choice removes then appends in a ${count == 2 ? 'full' : 'partial'} batch',
         () async {
           cooking(count);
           final scope = ids(controller.candidates).toSet();
@@ -124,8 +124,8 @@ void main() {
           }
           expect(ids(pool).toSet(), expectedPool);
           expect(ids(pool).toSet(), hasLength(pool.length));
-          expect(controller.pendingReplacementIndex, 0);
-          expect(controller.results, same(snapshot));
+          expect(controller.hasPendingReplacement, isTrue);
+          expect(ids(controller.results), [original[1].id]);
           expect(controller.result, isNull);
           expect(controller.selectedIndex, isNull);
           expect(controller.isDrawing, isFalse);
@@ -139,9 +139,9 @@ void main() {
           );
           expect(controller.restoreSessionExclusions(), isFalse);
           final replacement = drawOne();
-          expect(controller.pendingReplacementIndex, isNull);
-          expect(ids(controller.results), [replacement.id, original[1].id]);
-          expect(controller.results[1], same(original[1]));
+          expect(controller.hasPendingReplacement, isFalse);
+          expect(ids(controller.results), [original[1].id, replacement.id]);
+          expect(controller.results[0], same(original[1]));
           expect(ids(snapshot), ids(original));
           expect(controller.results, hasLength(2));
           expect(controller.canConfirm, isTrue);
@@ -189,7 +189,10 @@ void main() {
       final retained = drawOne();
       for (final target in scope.where((id) => id != retained.id)) {
         expect(
-          controller.beginReplacement(0, ReplacementChoice.redraw),
+          controller.beginReplacement(
+            controller.results.indexWhere((option) => option.id != retained.id),
+            ReplacementChoice.redraw,
+          ),
           isTrue,
         );
         final pool = controller.candidates;
@@ -199,7 +202,7 @@ void main() {
         final drawsBefore = random.bounds.length;
         expect(drawOne().id, target);
         expect(random.bounds.length, drawsBefore + 1);
-        expect(controller.results[1], same(retained));
+        expect(controller.results[0], same(retained));
       }
     },
   );
@@ -220,7 +223,7 @@ void main() {
         expect(controller.hasRound, isTrue);
         expect(controller.isModeLocked, isTrue);
         expect(controller.startDraw(), isTrue);
-        expect(controller.pendingReplacementIndex, 0);
+        expect(controller.hasPendingReplacement, isTrue);
         expect(controller.startDraw(), isFalse);
         expect(controller.canConfirm, isFalse);
         expect(await controller.confirm(), isFalse);
@@ -260,7 +263,7 @@ void main() {
           expect(controller.candidates, same(pool));
           expect(controller.selectedIndex, selectedIndex);
           expect(controller.sessionExclusions, exclusions);
-          expect(controller.pendingReplacementIndex, isNull);
+          expect(controller.hasPendingReplacement, isFalse);
           expect(controller.canConfirm, isTrue);
         }
       },
@@ -310,7 +313,7 @@ void main() {
       expect(controller.beginReplacement(0, ReplacementChoice.exclude), isTrue);
       controller.dispose();
       await createController();
-      expect(controller.pendingReplacementIndex, isNull);
+      expect(controller.hasPendingReplacement, isFalse);
       expect(controller.results, isEmpty);
       expect(controller.sessionExclusions, isEmpty);
       expect(controller.hasRound, isFalse);
@@ -371,12 +374,12 @@ void main() {
         (await controller.setOptionActive(outgoing.id, true)).changed,
         isFalse,
       );
-      expect(controller.pendingReplacementIndex, 0);
+      expect(controller.hasPendingReplacement, isTrue);
       expect(controller.candidates, same(pool));
       expect(controller.restartNotice, isNull);
       final changed = await controller.saveCategory(name: '另一个场景分类');
       expect(changed.changed, isTrue);
-      expect(controller.pendingReplacementIndex, isNull);
+      expect(controller.hasPendingReplacement, isFalse);
       expect(controller.results, isEmpty);
       expect(controller.result, isNull);
       expect(controller.selectedIndex, isNull);
@@ -411,7 +414,7 @@ void main() {
         );
         expect(controller.startDraw(), isTrue);
         reset();
-        expect(controller.pendingReplacementIndex, isNull);
+        expect(controller.hasPendingReplacement, isFalse);
         expect(controller.results, isEmpty);
         expect(controller.result, isNull);
         expect(controller.isDrawing, isFalse);
@@ -475,7 +478,7 @@ void main() {
           controller.beginReplacement(0, ReplacementChoice.redraw),
           isFalse,
         );
-        expect(controller.pendingReplacementIndex, isNull);
+        expect(controller.hasPendingReplacement, isFalse);
         expect(ids(controller.results), finalIds);
         if (failurePhase == ConfirmationPhase.beforeAcknowledgement) {
           await expectStoredMeal(finalIds);

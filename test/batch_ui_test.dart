@@ -104,9 +104,10 @@ void main() {
       expect(controller.results, hasLength(2));
       expect(controller.results.first.id, first);
       expect(controller.results.map((item) => item.id).toSet(), hasLength(2));
-      expect(find.text('已选 2 / 3 道 · 每次转一道'), findsOneWidget);
-      await tap(tester, find.text('足迹'));
-      await tap(tester, find.text('决定'));
+      expect(find.text('已选 2 / 3 道'), findsOneWidget);
+      expect(find.byType(NavigationBar), findsNothing);
+      await tap(tester, key('draw-back'));
+      await tap(tester, find.text('继续抽取'));
       expect(controller.results, hasLength(2));
       final names = controller.results.map((item) => item.name).join('、');
       await confirm(tester);
@@ -126,7 +127,7 @@ void main() {
   );
 
   testWidgets(
-    'custom count validates range and restart cancellation preserves slots',
+    'custom count validates range and restart cancellation preserves results',
     (tester) async {
       controller.changeScenario(MealScenario.cook);
       await mount(tester);
@@ -141,12 +142,14 @@ void main() {
       expect(controller.cookingCount, 10);
       await tap(tester, key('primary-action'));
       final chosen = controller.results.single.id;
-      await tap(tester, key('cooking-count-2'));
-      await tap(tester, find.text('继续这一餐'));
+      expect(key('cooking-count-2'), findsNothing);
+      await tap(tester, key('restart-round'));
+      await tap(tester, find.text('继续抽取'));
       expect(controller.cookingCount, 10);
       expect(controller.results.single.id, chosen);
+      await tap(tester, key('restart-round'));
+      await tap(tester, find.text('清空并重新开始'));
       await tap(tester, key('cooking-count-2'));
-      await tap(tester, find.text('更改并重新开始'));
       expect(controller.cookingCount, 2);
       expect(controller.hasRound, isFalse);
       expect(tester.takeException(), isNull);
@@ -238,7 +241,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(
           tester.getBottomLeft(key('primary-action')).dy,
-          lessThanOrEqualTo(tester.getTopLeft(find.byType(NavigationBar)).dy),
+          lessThanOrEqualTo(size.height),
         );
         expect(key('primary-action').hitTestable(), findsOneWidget);
         expect(tester.takeException(), isNull);

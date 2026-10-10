@@ -34,7 +34,7 @@ class MealController extends ChangeNotifier {
   List<FoodOption> _results = const [];
   int _cookingCount = 1;
   int? _selectedIndex;
-  int? _pendingReplacementIndex;
+  bool _hasPendingReplacement = false;
   ConfirmationOperation? _operation;
   bool _isDrawing = false;
   bool _isSaving = false;
@@ -54,6 +54,8 @@ class MealController extends ChangeNotifier {
   bool _dataUnavailable = false;
   List<FoodOption>? _cardDeck;
   int? _selectedCardIndex;
+  final Set<String> _collectedCardIds = {};
+  int _cardDeckShuffleRevision = 0;
   Future<bool>? _tutorialDismissal;
 
   MealPeriod get period => _period;
@@ -72,7 +74,8 @@ class MealController extends ChangeNotifier {
   int get cookingCount => _cookingCount;
   int get requestedCount => _scenario == MealScenario.cook ? _cookingCount : 1;
   bool get isSingleTarget => requestedCount == 1;
-  bool get isCardFlowSupported => isSingleTarget;
+  bool get isCardFlowSupported => true;
+  int get cardDeckShuffleRevision => _cardDeckShuffleRevision;
   List<FoodOption> get cardDeck {
     if (_preferences.mode != DrawMode.cards ||
         !isCardFlowSupported ||
@@ -99,7 +102,37 @@ class MealController extends ChangeNotifier {
   FoodOption? get selectedCard =>
       _selectedCardIndex == null ? null : _cardDeck![_selectedCardIndex!];
   List<FoodOption> get results => _results;
-  int? get pendingReplacementIndex => _pendingReplacementIndex;
+  FoodOption? get cardCentralResult => _result;
+  int? get focusedResultIndex {
+    if (_result == null) return null;
+    final index = _results.indexWhere((option) => option.id == _result!.id);
+    return index < 0 ? null : index;
+  }
+
+  List<int> get collectedCardResultIndexes => List.unmodifiable([
+    for (var index = 0; index < _results.length; index++)
+      if (_collectedCardIds.contains(_results[index].id)) index,
+  ]);
+  List<FoodOption> get collectedResults => _preferences.mode == DrawMode.cards
+      ? List.unmodifiable([
+          for (final index in collectedCardResultIndexes) _results[index],
+        ])
+      : _results;
+  bool get _hasUncollectedCard =>
+      _preferences.mode == DrawMode.cards &&
+      !isSingleTarget &&
+      _result != null &&
+      !_collectedCardIds.contains(_result!.id);
+  bool get canCollectCard =>
+      _preferences.mode == DrawMode.cards &&
+      !isSingleTarget &&
+      !isBusy &&
+      !_isDrawing &&
+      _operation == null &&
+      !_hasPendingReplacement &&
+      _result != null;
+  // Pending replacement state is independent of the visible result order.
+  bool get hasPendingReplacement => _hasPendingReplacement;
   int get availableCount => _remainingCandidates().length;
   bool get hasCandidateShortage =>
       !hasRound && availableCount > 0 && availableCount < requestedCount;
@@ -108,13 +141,16 @@ class MealController extends ChangeNotifier {
       !_dataUnavailable &&
       (_preferences.mode != DrawMode.cards || isCardFlowSupported) &&
       !_isDrawing &&
+      !_hasUncollectedCard &&
       _operation == null &&
-      (_pendingReplacementIndex != null || _results.length < requestedCount) &&
+      (_hasPendingReplacement || _results.length < requestedCount) &&
       (hasRound ? availableCount > 0 : availableCount >= requestedCount);
   bool get canConfirm =>
+      !isBusy && !_isDrawing && !_hasPendingReplacement && _results.isNotEmpty;
+  bool get canConfirmRetained =>
       !isBusy &&
-      !_isDrawing &&
-      _pendingReplacementIndex == null &&
+      _operation == null &&
+      _hasPendingReplacement &&
       _results.isNotEmpty;
   MealPreferences get preferences => _preferences;
   Set<String> get sessionExclusions => Set.unmodifiable(_sessionExclusions);
@@ -160,7 +196,7 @@ class MealController extends ChangeNotifier {
   }
 
   List<FoodOption> _remainingCandidates() {
-    if (_pendingReplacementIndex != null) return _roundCandidates!;
+    if (_hasPendingReplacement) return _roundCandidates!;
     final scope = _roundScope;
     if (scope == null) return _eligibleCandidates();
     final selectedIds = _results.map((option) => option.id).toSet();
@@ -180,7 +216,7 @@ class MealController extends ChangeNotifier {
       !_dataUnavailable &&
       !_isDrawing &&
       _operation == null &&
-      _pendingReplacementIndex == null &&
+      !_hasPendingReplacement &&
       index >= 0 &&
       index < _results.length;
 
@@ -211,7 +247,13 @@ class MealController extends ChangeNotifier {
     _roundCandidates = List.unmodifiable(pool);
     _cardDeck = _preferences.mode == DrawMode.cards ? _roundCandidates : null;
     _selectedCardIndex = null;
-    _pendingReplacementIndex = index;
+    _hasPendingReplacement = true;
+    _results = List.unmodifiable([
+      for (var slot = 0; slot < _results.length; slot++)
+        if (slot != index) _results[slot],
+    ]);
+    _collectedCardIds.remove(outgoing.id);
+    if (_preferences.mode == DrawMode.cards) _cardDeckShuffleRevision++;
     _chosen = null;
     _result = null;
     _selectedIndex = null;
@@ -351,8 +393,7 @@ class MealController extends ChangeNotifier {
     if (isBusy ||
         _isDrawing ||
         _operation != null ||
-        (_pendingReplacementIndex == null &&
-            _results.length >= requestedCount)) {
+        (!_hasPendingReplacement && _results.length >= requestedCount)) {
       return false;
     }
     if (_dataUnavailable) return false;
@@ -379,8 +420,10 @@ class MealController extends ChangeNotifier {
     return true;
   }
 
-  List<FoodOption> _shuffledDeck(List<FoodOption> pool) =>
-      List.unmodifiable(List<FoodOption>.of(pool)..shuffle(_random));
+  List<FoodOption> _shuffledDeck(List<FoodOption> pool) {
+    _cardDeckShuffleRevision++;
+    return List.unmodifiable(List<FoodOption>.of(pool)..shuffle(_random));
+  }
 
   void _refreshUnstartedDeck() {
     final eligible = _eligibleCandidates();
@@ -420,7 +463,13 @@ class MealController extends ChangeNotifier {
   }
 
   bool cancelCardSelection() {
-    if (isBusy || _isDrawing || _result != null) return false;
+    if (isBusy ||
+        _isDrawing ||
+        _operation != null ||
+        _hasUncollectedCard ||
+        (isSingleTarget && _result != null)) {
+      return false;
+    }
     _selectedCardIndex = null;
     _notify();
     return true;
@@ -453,16 +502,55 @@ class MealController extends ChangeNotifier {
     if (!_isDrawing) return;
     _isDrawing = false;
     _result = _chosen;
-    final replacementIndex = _pendingReplacementIndex;
-    if (replacementIndex == null) {
-      _results = List.unmodifiable([..._results, _chosen!]);
-    } else {
-      final updated = List<FoodOption>.of(_results);
-      updated[replacementIndex] = _chosen!;
-      _results = List.unmodifiable(updated);
-      _pendingReplacementIndex = null;
+    _results = List.unmodifiable([..._results, _chosen!]);
+    _hasPendingReplacement = false;
+    if (_preferences.mode == DrawMode.cards) {
+      // Ordinary next dishes keep the fan's remaining identities and order.
+      _cardDeck = List.unmodifiable(
+        _cardDeck!.where((option) => option.id != _chosen!.id),
+      );
+      _selectedCardIndex = null;
     }
     _notify();
+  }
+
+  bool collectCard() {
+    if (!canCollectCard) return false;
+    _collectedCardIds.add(_result!.id);
+    _result = null;
+    _notify();
+    return true;
+  }
+
+  bool collectCardResult() => collectCard();
+
+  bool focusResult(int index) {
+    if (isBusy ||
+        _isDrawing ||
+        _operation != null ||
+        _hasPendingReplacement ||
+        _hasUncollectedCard ||
+        index < 0 ||
+        index >= _results.length) {
+      return false;
+    }
+    _result = _results[index];
+    _selectedCardIndex = null;
+    _notify();
+    return true;
+  }
+
+  // Called only after the presentation's explicit retained-meal decision.
+  // Cancel any sampled, unrevealed dish before establishing the save payload.
+  Future<bool> confirmRetained() {
+    if (!canConfirmRetained) return Future.value(false);
+    _isDrawing = false;
+    _chosen = null;
+    _selectedIndex = null;
+    _selectedCardIndex = null;
+    _hasPendingReplacement = false;
+    _cardDeck = const [];
+    return confirm();
   }
 
   Future<bool> confirm() async {
@@ -570,8 +658,9 @@ class MealController extends ChangeNotifier {
     _chosen = null;
     _result = null;
     _results = const [];
+    _collectedCardIds.clear();
     _selectedIndex = null;
-    _pendingReplacementIndex = null;
+    _hasPendingReplacement = false;
     _operation = null;
     _isDrawing = false;
   }
@@ -583,15 +672,36 @@ class MealController extends ChangeNotifier {
 
   // The UI dismisses after a successful confirmation, or immediately on Skip.
   // This independent write is allowed while a draw or confirmation is active.
-  Future<bool> dismissCardTutorial() {
-    if (_preferences.cardTutorialDismissed) return Future.value(true);
-    return _tutorialDismissal ??= _persistCardTutorialDismissal();
+  Future<bool> dismissCardTutorial({bool includeCollection = false}) {
+    if (_preferences.cardTutorialDismissed &&
+        (!includeCollection || _preferences.cardCollectionTutorialDismissed)) {
+      return Future.value(true);
+    }
+    final pending = _tutorialDismissal;
+    if (pending != null) {
+      return pending.then<bool>(
+        (saved) => saved
+            ? dismissCardTutorial(includeCollection: includeCollection)
+            : false,
+      );
+    }
+    return _tutorialDismissal = _persistCardTutorialDismissal(
+      includeCollection: includeCollection,
+    );
   }
 
-  Future<bool> _persistCardTutorialDismissal() async {
+  Future<bool> _persistCardTutorialDismissal({
+    required bool includeCollection,
+  }) async {
     try {
-      await _repository.dismissCardTutorial();
-      _preferences = _preferences.copyWith(cardTutorialDismissed: true);
+      await _repository.dismissCardTutorial(
+        includeCollection: includeCollection,
+      );
+      _preferences = _preferences.copyWith(
+        cardTutorialDismissed: true,
+        cardCollectionTutorialDismissed:
+            includeCollection || _preferences.cardCollectionTutorialDismissed,
+      );
       return true;
     } catch (_) {
       _error = '引导状态暂时无法保存，请重试。';
@@ -617,10 +727,14 @@ class MealController extends ChangeNotifier {
       await _repository.savePreferences(
         preferences.copyWith(
           cardTutorialDismissed: _preferences.cardTutorialDismissed,
+          cardCollectionTutorialDismissed:
+              _preferences.cardCollectionTutorialDismissed,
         ),
       );
       _preferences = preferences.copyWith(
         cardTutorialDismissed: _preferences.cardTutorialDismissed,
+        cardCollectionTutorialDismissed:
+            _preferences.cardCollectionTutorialDismissed,
       );
       _clearCardSelection();
       _error = null;

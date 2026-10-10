@@ -4,6 +4,12 @@ Updated: 2026-10-09, Asia/Shanghai.
 
 ## Resume here
 
+The 2026-10-10 confirmed redesign is implemented locally on `codex/first-restore`.
+See [current behavior and verification](../verification/first-restore.md) before
+using the historical sections below. Full-screen navigation, lower fan layout,
+remove-and-append replacement, and explicit retained-meal confirmation supersede
+the older contracts here and in the still-unedited formal issues.
+
 The user completed the S08 design discussion on 2026-10-09 and authorized implementation in the next session. This session records decisions only. [Issue #9](https://github.com/xinlx227-ai/Whatever/issues/9) owns single-target Cards in all three scenarios, including single-result replacement; [Issue #10](https://github.com/xinlx227-ai/Whatever/issues/10) owns multi-target collection; [Issue #11](https://github.com/xinlx227-ai/Whatever/issues/11) owns multi-target slot replacement. These are accepted design directions, not implementation or validation evidence. Read the current formal issues before implementation.
 
 S04 implementation on 2026-10-07 applies the user's subsequently approved complete eating inventory, Rice bowl meals (盖饭套餐) label, frozen cooking memberships, independent page scenario selections, and shared Decide meal period. Earlier unresolved-content notes below are historical. See [Issue #5](https://github.com/xinlx227-ai/Whatever/issues/5) for slice ownership and [S04 delivery evidence](../verification/s04-android.md) for implementation and specification synchronization status.

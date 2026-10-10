@@ -71,7 +71,7 @@ void main() {
       await tap(tester, chip('快手菜'));
       await tap(tester, apply);
       expect(find.text('更换筛选条件？'), findsOneWidget);
-      await tap(tester, find.text('继续这一餐'));
+      await tap(tester, find.text('继续抽取'));
       expect(controller.result, same(chosen));
       expect(controller.selectedCategoryIds, isEmpty);
       await tap(tester, open);
@@ -111,7 +111,7 @@ void main() {
         controller.excludeForSession(food.id);
       }
       await mount(tester);
-      expect(find.text('没有符合条件的选项'), findsOneWidget);
+      expect(find.textContaining('没有符合条件的选项'), findsOneWidget);
       await tap(tester, find.byKey(const Key('adjust-empty-conditions')));
       await tap(tester, find.byKey(const Key('filter-all')));
       await tap(tester, apply);

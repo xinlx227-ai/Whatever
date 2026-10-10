@@ -1,0 +1,15 @@
+{
+  "baseCommit": "d70ada57f941b52d759c65ee3831223541172b7c",
+  "branch": "codex/first-restore",
+  "status": "uncommitted boolean pending replacement refactor verified 2026-10-10",
+  "sha256": {
+    "lib/application/meal_controller.dart": "2b2f91ec61182b8172b4566ecb4cc879f0cbaa5fcd9234fe86bc4f6b9cab747f",
+    "lib/data/meal_repository.dart": "da6f82769c32a8b4f315f34115a62ef4e107d01d28996efa4db7c06e2f0d8bee",
+    "lib/domain/meal_preferences.dart": "00f16dac180e54a881902a19dab30b27ec0efb1181bf04d6c7000d39fbb86d08",
+    "lib/presentation/meal_app.dart": "e9bd0a11a6fc11938b0f6df1ea3b5eb35e30815409b14c67f68734b8d0a75ff6",
+    "lib/presentation/card_draw.dart": "5edc49f627fe6936d0c87d76c3d4c1e4c2e4f48cce9c64bc7d91f0a3881bfe12",
+    "lib/presentation/wheel.dart": "7bbeda75d5808bf0915e11eafbe27db8c245c38afca4b99b7c90866f9f9e05ae"
+  },
+  "validation": "flutter analyze --no-pub; flutter test --no-pub --reporter expanded: 257 passed; git diff --check",
+  "apk": "Not rebuilt; overlap manifest identifies the prior APK."
+}

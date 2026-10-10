@@ -1,0 +1,14 @@
+{
+  "baseCommit": "d70ada57f941b52d759c65ee3831223541172b7c",
+  "branch": "codex/first-restore",
+  "status": "uncommitted verified working tree",
+  "sha256": {
+    "lib/application/meal_controller.dart": "17716d0133037f1d359e1a3fd14e11ca0a4c6a35678070a148bd99e47d5a828f",
+    "lib/data/meal_repository.dart": "da6f82769c32a8b4f315f34115a62ef4e107d01d28996efa4db7c06e2f0d8bee",
+    "lib/domain/meal_preferences.dart": "00f16dac180e54a881902a19dab30b27ec0efb1181bf04d6c7000d39fbb86d08",
+    "lib/presentation/meal_app.dart": "49e3a7cbfa17906ef2e721772bc77c536a93c559025dc4936c6632d156773927",
+    "lib/presentation/card_draw.dart": "b308db5a21a4430706c403a641ab6f448c433ed9f6601e9a1ed022ddf5366a61",
+    "lib/presentation/wheel.dart": "7bbeda75d5808bf0915e11eafbe27db8c245c38afca4b99b7c90866f9f9e05ae"
+  },
+  "releaseApkSha256": "8e38ddf79e57c678de36a3b8a693acbef37226692950ee376c6d9601e1253d03"
+}

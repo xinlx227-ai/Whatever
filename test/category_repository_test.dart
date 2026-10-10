@@ -485,7 +485,7 @@ void main() {
       );
       final inspector = await inspect();
       try {
-        expect(await inspector.getVersion(), 6);
+        expect(await inspector.getVersion(), 7);
         expect(await inspector.query('options'), beforeOptions);
         expect(await inspector.query('option_categories'), beforeMemberships);
         expect(await inspector.rawQuery('PRAGMA foreign_key_check'), isEmpty);

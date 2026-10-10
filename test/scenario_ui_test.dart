@@ -79,19 +79,15 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('library remembers its own scenario without touching the round', (
+  testWidgets('library remembers its own scenario across a fullscreen round', (
     tester,
   ) async {
     await mount(tester);
-    controller.startDraw();
-    controller.finishDraw();
-    await tester.pumpAndSettle();
-    final chosen = controller.result;
     await tap(tester, find.text('选项库'));
     await tap(tester, scenario('library', MealScenario.restaurant));
     expect(find.byType(AlertDialog), findsNothing);
     expect(controller.scenario, MealScenario.eat);
-    expect(controller.result, same(chosen));
+    expect(controller.hasRound, isFalse);
     expect(find.text('肯德基'), findsOneWidget);
     expect(find.text('黄焖鸡米饭'), findsNothing);
     await tap(tester, find.text('决定'));
@@ -99,7 +95,18 @@ void main() {
       tester.widget<ChoiceChip>(scenario('decide', MealScenario.eat)).selected,
       isTrue,
     );
+    await tap(tester, find.byKey(const Key('primary-action')));
+    final chosen = controller.result;
+    expect(chosen, isNotNull);
+    expect(find.byKey(const Key('draw-stage')), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
+    expect(scenario('decide', MealScenario.restaurant), findsNothing);
+    await tap(tester, find.byKey(const Key('draw-back')));
+    await tap(tester, find.text('继续抽取'));
     expect(controller.result, same(chosen));
+    await tap(tester, find.byKey(const Key('draw-back')));
+    await tap(tester, find.text('离开'));
+    expect(controller.hasRound, isFalse);
     await tap(tester, find.text('选项库'));
     expect(
       tester
@@ -107,41 +114,45 @@ void main() {
           .selected,
       isTrue,
     );
-    expect(controller.result, same(chosen));
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('scenario restart cancel retains result and shared meal period', (
-    tester,
-  ) async {
-    await mount(tester);
-    await tap(tester, find.byKey(const ValueKey('decide-period-lateNight')));
-    controller.startDraw();
-    controller.finishDraw();
-    await tester.pumpAndSettle();
-    final chosen = controller.result;
-    await tap(tester, scenario('decide', MealScenario.cook));
-    expect(find.text('换个场景？'), findsOneWidget);
-    await tap(tester, find.text('继续这一餐'));
     expect(controller.scenario, MealScenario.eat);
-    expect(controller.period, MealPeriod.lateNight);
-    expect(controller.result, same(chosen));
-    await tap(tester, scenario('decide', MealScenario.cook));
-    await tap(tester, find.text('切换并重新开始'));
-    expect(controller.scenario, MealScenario.cook);
-    expect(controller.period, MealPeriod.lateNight);
-    expect(controller.result, isNull);
-    expect(find.text('今天，做点什么？'), findsOneWidget);
-    await tap(tester, scenario('decide', MealScenario.restaurant));
-    expect(controller.period, MealPeriod.lateNight);
-    expect(find.text('今天，去哪儿吃？'), findsOneWidget);
-    await tap(tester, scenario('decide', MealScenario.eat));
-    expect(controller.period, MealPeriod.lateNight);
     expect(await tester.runAsync(repository.history), isEmpty);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('portrait launch exposes the primary action above navigation', (
+  testWidgets(
+    'restart cancellation keeps results; entry switch keeps meal period',
+    (tester) async {
+      await mount(tester);
+      await tap(tester, find.byKey(const ValueKey('decide-period-lateNight')));
+      await tap(tester, find.byKey(const Key('primary-action')));
+      final chosen = controller.result;
+      expect(scenario('decide', MealScenario.cook), findsNothing);
+      await tap(tester, find.byKey(const Key('restart-round')));
+      expect(find.text('重新开始这一餐？'), findsOneWidget);
+      await tap(tester, find.text('继续抽取'));
+      expect(controller.scenario, MealScenario.eat);
+      expect(controller.period, MealPeriod.lateNight);
+      expect(controller.result, same(chosen));
+      await tap(tester, find.byKey(const Key('restart-round')));
+      await tap(tester, find.text('清空并重新开始'));
+      expect(find.byKey(const Key('draw-stage')), findsNothing);
+      expect(find.byType(NavigationBar), findsOneWidget);
+      await tap(tester, scenario('decide', MealScenario.cook));
+      expect(controller.scenario, MealScenario.cook);
+      expect(controller.period, MealPeriod.lateNight);
+      expect(controller.result, isNull);
+      expect(find.text('今天，做点什么？'), findsOneWidget);
+      await tap(tester, scenario('decide', MealScenario.restaurant));
+      expect(controller.period, MealPeriod.lateNight);
+      expect(find.text('今天，去哪儿吃？'), findsOneWidget);
+      await tap(tester, scenario('decide', MealScenario.eat));
+      expect(controller.period, MealPeriod.lateNight);
+      expect(await tester.runAsync(repository.history), isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('portrait entry keeps artwork and primary action reachable', (
     tester,
   ) async {
     await mount(tester);
@@ -155,10 +166,16 @@ void main() {
       // Change the condition without scrolling; this remains the initial view.
       controller.changeScenario(value);
       await tester.pumpAndSettle();
+      // The accepted larger artwork stays legible. Cooking's extra count row
+      // may require scrolling on a viewport with large system insets.
+      if (value == MealScenario.cook) {
+        await tester.ensureVisible(find.byKey(const Key('primary-action')));
+        await tester.pumpAndSettle();
+      }
       final navigationTop = tester.getRect(find.byType(NavigationBar)).top;
       for (final target in [
         find.byKey(const Key('primary-action')),
-        find.text('一点小期待，一顿好好吃的饭'),
+        find.byKey(const ValueKey('draw-mode-wheel')),
       ]) {
         final bounds = tester.getRect(target);
         expect(bounds.top, greaterThanOrEqualTo(48));
