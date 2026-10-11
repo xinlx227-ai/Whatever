@@ -747,14 +747,19 @@ class MealController extends ChangeNotifier {
     }
   }
 
-  // Future controls restart a started round explicitly before changing conditions.
-  Future<bool> updatePreferences(MealPreferences preferences) async {
+  // A confirmed filter change clears the round only after persistence succeeds.
+  Future<bool> updatePreferences(
+    MealPreferences preferences, {
+    bool restartRound = false,
+  }) async {
     if (isBusy) return false;
     if (preferences.mode == _preferences.mode &&
         preferences.excludeYesterday == _preferences.excludeYesterday) {
       return true;
     }
-    if (hasRound) return false;
+    if (hasRound && (!restartRound || preferences.mode != _preferences.mode)) {
+      return false;
+    }
     _isUpdatingPreferences = true;
     _notify();
     try {
@@ -771,6 +776,7 @@ class MealController extends ChangeNotifier {
         cardCollectionTutorialDismissed:
             _preferences.cardCollectionTutorialDismissed,
       );
+      if (hasRound) _clearRound();
       _clearCardSelection();
       _error = null;
       return true;

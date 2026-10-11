@@ -630,23 +630,35 @@ class _MealHomeState extends State<_MealHome>
 
   Future<void> selectCategories() async {
     if (model.isBusy || asking) return;
-    final selection = await showModalBottomSheet<CategoryFilterSelection>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (context) => ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * .85,
+    setState(() => asking = true);
+    syncAnimationPause();
+    CategoryFilterSelection? selection;
+    try {
+      selection = await showModalBottomSheet<CategoryFilterSelection>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        builder: (context) => ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * .85,
+          ),
+          child: CategoryFilterSheet(
+            categories: model.categoriesFor(model.scenario),
+            selectedIds: model.selectedCategoryIds,
+            period: model.period,
+            excludeYesterday: model.preferences.excludeYesterday,
+          ),
         ),
-        child: CategoryFilterSheet(
-          categories: model.categoriesFor(model.scenario),
-          selectedIds: model.selectedCategoryIds,
-          period: model.period,
-        ),
-      ),
-    );
+      );
+    } finally {
+      if (mounted) {
+        setState(() => asking = false);
+        syncAnimationPause();
+      }
+    }
     if (selection == null || !mounted || model.isBusy) return;
     final unchanged =
+        selection.excludeYesterday == model.preferences.excludeYesterday &&
         selection.period == model.period &&
         selection.ids.length == model.selectedCategoryIds.length &&
         selection.ids.containsAll(model.selectedCategoryIds);
@@ -656,7 +668,30 @@ class _MealHomeState extends State<_MealHome>
       return;
     }
     if (!mounted || model.isBusy) return;
+    if (!await model.updatePreferences(
+      model.preferences.copyWith(excludeYesterday: selection.excludeYesterday),
+      restartRound: true,
+    )) {
+      return;
+    }
+    if (!mounted) return;
     model.changeCategoryFilters(selection.ids, period: selection.period);
+    setState(() => stageOpen = false);
+  }
+
+  Future<void> selectYesterday(bool selected) async {
+    if (model.isBusy || asking) return;
+    if (model.hasRound &&
+        !await ask('更换筛选条件？', '当前还未确认的选择会清空，按新条件重新开始。', '应用并重新开始')) {
+      return;
+    }
+    if (!mounted || model.isBusy) return;
+    if (await model.updatePreferences(
+      model.preferences.copyWith(excludeYesterday: selected),
+      restartRound: true,
+    )) {
+      if (mounted) setState(() => stageOpen = false);
+    }
   }
 
   Future<void> back() async {
@@ -813,26 +848,35 @@ class _MealHomeState extends State<_MealHome>
           .toList(),
     ),
     SizedBox(height: 12),
-    Row(
+    Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Expanded(
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              key: Key('category-filter-button'),
-              onPressed: model.isBusy ? null : selectCategories,
-              icon: Icon(Icons.filter_list),
-              label: Text(
+        TextButton.icon(
+          key: Key('category-filter-button'),
+          onPressed: model.isBusy ? null : selectCategories,
+          icon: Icon(Icons.filter_list),
+          label: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
                 model.selectedCategoryIds.isEmpty
                     ? '全部分类'
                     : '已选 ${model.selectedCategoryIds.length} 个分类',
               ),
-            ),
+              Text(
+                '${model.availableCount} 个候选',
+                style: TextStyle(color: muted, fontSize: 12),
+              ),
+            ],
           ),
         ),
-        Text(
-          '${model.availableCount} 个候选',
-          style: TextStyle(color: muted, fontSize: 12),
+        FilterChip(
+          key: const Key('yesterday-filter-button'),
+          label: const Text('昨天选过的不选'),
+          selected: model.preferences.excludeYesterday,
+          onSelected: model.isBusy ? null : selectYesterday,
         ),
       ],
     ),
@@ -930,7 +974,7 @@ class _MealHomeState extends State<_MealHome>
       ),
     if (model.availableCount == 0) ...[
       const SizedBox(height: 12),
-      const Text('没有符合条件的选项，请调整分类或餐段。'),
+      const Text('没有符合条件的选项，请调整分类、餐段或昨天筛选。'),
       Wrap(
         children: [
           TextButton(
@@ -977,7 +1021,14 @@ class _MealHomeState extends State<_MealHome>
                     ),
                   ),
                 ),
-                const SizedBox(width: 48),
+                IconButton(
+                  key: const Key('stage-filter-button'),
+                  tooltip: '调整条件',
+                  onPressed: model.isBusy || model.isDrawing || asking
+                      ? null
+                      : selectCategories,
+                  icon: const Icon(Icons.filter_list),
+                ),
               ],
             ),
           ),

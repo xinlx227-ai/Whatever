@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import '../domain/meal.dart';
 
 class CategoryFilterSelection {
-  const CategoryFilterSelection(this.ids, this.period);
+  const CategoryFilterSelection(this.ids, this.period, this.excludeYesterday);
   final Set<String> ids;
   final MealPeriod period;
+  final bool excludeYesterday;
 }
 
 class CategoryFilterSheet extends StatefulWidget {
@@ -14,11 +15,13 @@ class CategoryFilterSheet extends StatefulWidget {
     required this.categories,
     required this.selectedIds,
     required this.period,
+    required this.excludeYesterday,
   });
 
   final List<MealCategory> categories;
   final Set<String> selectedIds;
   final MealPeriod period;
+  final bool excludeYesterday;
 
   @override
   State<CategoryFilterSheet> createState() => _CategoryFilterSheetState();
@@ -27,6 +30,7 @@ class CategoryFilterSheet extends StatefulWidget {
 class _CategoryFilterSheetState extends State<CategoryFilterSheet> {
   late final Set<String> ids = {...widget.selectedIds};
   late MealPeriod period = widget.period;
+  late bool excludeYesterday = widget.excludeYesterday;
 
   @override
   Widget build(BuildContext context) => SafeArea(
@@ -96,12 +100,19 @@ class _CategoryFilterSheetState extends State<CategoryFilterSheet> {
                 ),
             ],
           ),
+          const SizedBox(height: 16),
+          FilterChip(
+            key: const Key('filter-yesterday'),
+            label: const Text('昨天选过的不选'),
+            selected: excludeYesterday,
+            onSelected: (value) => setState(() => excludeYesterday = value),
+          ),
           const SizedBox(height: 24),
           FilledButton(
             key: const Key('apply-category-filters'),
             onPressed: () => Navigator.pop(
               context,
-              CategoryFilterSelection(Set.of(ids), period),
+              CategoryFilterSelection(Set.of(ids), period, excludeYesterday),
             ),
             child: const Text('应用条件'),
           ),
