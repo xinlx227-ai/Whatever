@@ -9,6 +9,7 @@ import '../application/meal_controller.dart';
 import '../domain/meal.dart';
 import '../domain/meal_preferences.dart';
 import 'card_draw.dart';
+import 'meal_history.dart';
 import 'wheel.dart';
 import 'option_art.dart';
 import 'option_library.dart';
@@ -185,6 +186,7 @@ class _MealHomeState extends State<_MealHome>
   bool get paused => asking || backgrounded;
   int tab = 1;
   MealScenario libraryScenario = MealScenario.eat;
+  MealScenario? historyScenario;
   double fromAngle = 0, toAngle = 0;
   WheelLayout? displayedWheel;
   bool asking = false;
@@ -1197,98 +1199,15 @@ class _MealHomeState extends State<_MealHome>
     ),
   ];
 
-  List<Widget> history() {
-    final widgets = <Widget>[
-      SizedBox(height: 32),
-      Text(
-        '好好吃饭的足迹',
-        style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
-      ),
-      SizedBox(height: 8),
-      Text('记下每一次不再纠结的决定。', style: TextStyle(color: muted)),
-      SizedBox(height: 24),
-    ];
-    if (model.history.isEmpty) {
-      widgets.add(
-        Center(
-          child: Padding(
-            padding: EdgeInsets.symmetric(vertical: 48),
-            child: Column(
-              children: [
-                foodArt('rice', 120),
-                SizedBox(height: 24),
-                Text(
-                  '第一餐，值得期待',
-                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700),
-                ),
-                SizedBox(height: 12),
-                Text('确认一次选择，就会在这里留下足迹。', style: TextStyle(color: muted)),
-                SizedBox(height: 32),
-                FilledButton(
-                  onPressed: () => selectTab(1),
-                  child: Text('去决定这一餐'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-      return widgets;
-    }
-    String? previousDate;
-    for (final entry in model.history) {
-      final time = entry.confirmedAt.toLocal();
-      final date = '${time.year}年${time.month}月${time.day}日';
-      if (previousDate != date) {
-        widgets.add(
-          Padding(
-            padding: EdgeInsets.only(top: 16, bottom: 8),
-            child: Text(date, style: TextStyle(color: muted, fontSize: 13)),
-          ),
-        );
-        previousDate = date;
-      }
-      widgets.add(
-        Container(
-          key: ValueKey('history-${entry.operationId}'),
-          padding: EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(
-                color: Theme.of(context).colorScheme.outlineVariant,
-              ),
-            ),
-          ),
-          child: Row(
-            children: [
-              OptionArt(option: entry.option, size: 60),
-              SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      entry.options.map((option) => option.name).join('、'),
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')} · ${entry.period.label} · ${MealScenario.fromKey(entry.option.scenario).label}',
-                      style: TextStyle(color: muted, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    return widgets;
-  }
+  List<Widget> history() => [
+    MealHistory(
+      controller: model,
+      scenario: historyScenario,
+      onScenarioChanged: (scenario) =>
+          setState(() => historyScenario = scenario),
+      onDecide: () => selectTab(1),
+    ),
+  ];
 }
 
 // Own paging state only while the entry is mounted. A drawing-stage scroll

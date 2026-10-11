@@ -933,6 +933,23 @@ class MealRepository {
     );
   }
 
+  Future<bool> deleteHistory(String operationId) =>
+      _database.transaction((transaction) async {
+        // The v8 foreign key has no cascade. Remove children and their complete
+        // record in one transaction while retaining all referenced option data.
+        await transaction.delete(
+          'history_items',
+          where: 'operation_id = ?',
+          whereArgs: [operationId],
+        );
+        final deleted = await transaction.delete(
+          'history_records',
+          where: 'operation_id = ?',
+          whereArgs: [operationId],
+        );
+        return deleted > 0;
+      });
+
   Future<void> confirm(ConfirmationOperation operation) async {
     if (operation.operationId.trim().isEmpty) {
       throw ArgumentError.value(operation.operationId, 'operationId');

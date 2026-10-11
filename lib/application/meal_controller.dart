@@ -48,8 +48,8 @@ class MealController extends ChangeNotifier {
   bool _isUpdatingPreferences = false;
   int _pendingDataChanges = 0;
   Future<void> _dataChanges = Future.value();
-  Future<void> _libraryChanges = Future.value();
-  int _pendingLibraryChanges = 0;
+  Future<void> _mutations = Future.value();
+  int _pendingMutations = 0;
   Completer<void>? _confirmationFinished;
   String? _restartNotice;
   bool _dataUnavailable = false;
@@ -160,8 +160,9 @@ class MealController extends ChangeNotifier {
       _isSaving ||
       _isUpdatingPreferences ||
       _pendingDataChanges > 0 ||
-      _pendingLibraryChanges > 0;
+      _pendingMutations > 0;
   String? get restartNotice => _restartNotice;
+  bool get needsDataRefresh => _dataUnavailable;
 
   List<FoodOption> _eligibleCandidates() {
     if (_dataUnavailable) return const [];
@@ -346,30 +347,60 @@ class MealController extends ChangeNotifier {
   Future<OptionMutationResult> deleteCategory(String id) =>
       _mutateLibrary(() => _repository.deleteCategory(id));
 
+  Future<bool> deleteHistory(String operationId) => _mutateData(
+    () async {
+      final deleted = await _repository.deleteHistory(operationId);
+      if (deleted) {
+        // A later refresh failure must not resurrect a committed deletion in
+        // the last readable snapshot.
+        _history = List.unmodifiable(
+          _history.where((entry) => entry.operationId != operationId),
+        );
+      }
+      return deleted;
+    },
+    changed: (deleted) => deleted,
+    failureMessage: '足迹暂时无法删除，请重试。',
+  );
+
   Future<OptionMutationResult> _mutateLibrary(
     Future<OptionMutationResult> Function() mutation,
-  ) {
-    final result = Completer<OptionMutationResult>();
-    _pendingLibraryChanges++;
+  ) => _mutateData(
+    mutation,
+    changed: (outcome) => outcome.changed,
+    onFailure: () => const OptionMutationResult(
+      OptionMutationStatus.failed,
+      message: '选项暂时无法保存，请重试。',
+    ),
+  );
+
+  Future<T> _mutateData<T>(
+    Future<T> Function() mutation, {
+    required bool Function(T) changed,
+    T Function()? onFailure,
+    String? failureMessage,
+  }) {
+    final result = Completer<T>();
+    _pendingMutations++;
     _notify();
-    _libraryChanges = _libraryChanges.then((_) async {
+    _mutations = _mutations.then((_) async {
       try {
         // Reserve the action boundary before waiting: a confirmation cannot start
         // between the durable write and the invalidation of its old draw pool.
         await _confirmationFinished?.future;
         await _dataChanges;
         final outcome = await mutation();
-        if (outcome.changed) await applyDataChange(changed: true);
+        if (changed(outcome)) await applyDataChange(changed: true);
         result.complete(outcome);
-      } catch (_) {
-        result.complete(
-          const OptionMutationResult(
-            OptionMutationStatus.failed,
-            message: '选项暂时无法保存，请重试。',
-          ),
-        );
+      } catch (error, stack) {
+        if (failureMessage != null) _error = failureMessage;
+        if (onFailure == null) {
+          result.completeError(error, stack);
+        } else {
+          result.complete(onFailure());
+        }
       } finally {
-        _pendingLibraryChanges--;
+        _pendingMutations--;
         _notify();
       }
     });
@@ -819,6 +850,11 @@ class MealController extends ChangeNotifier {
       }
     });
     return _dataChanges;
+  }
+
+  Future<void> retryDataRefresh() {
+    if (!_dataUnavailable || isBusy) return Future.value();
+    return applyDataChange(changed: true);
   }
 
   String? takeRestartNotice() {
