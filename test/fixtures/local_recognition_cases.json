@@ -1,0 +1,2302 @@
+{
+  "datasetVersion": "2026-10-11.1",
+  "provenance": "Project-authored labels from accepted seed inventory and Issue 12 identity/branch decisions. A finite, non-independent regression corpus; no universal accuracy claim.",
+  "cases": [
+    {
+      "id": "LR-001",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  黄焖鸡米饭  ",
+      "b": "黄焖鸡米饭",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-002",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  牛肉面  ",
+      "b": "牛肉面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-003",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  小笼包  ",
+      "b": "小笼包",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-004",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  煎饼果子  ",
+      "b": "煎饼果子",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-005",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  皮蛋瘦肉粥  ",
+      "b": "皮蛋瘦肉粥",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-006",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  汉堡套餐  ",
+      "b": "汉堡套餐",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-007",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  豆浆  ",
+      "b": "豆浆",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-008",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  豆奶  ",
+      "b": "豆奶",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-009",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  宫保鸡丁盖饭  ",
+      "b": "宫保鸡丁盖饭",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-010",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  红烧肉盖饭  ",
+      "b": "红烧肉盖饭",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-011",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  炸酱面  ",
+      "b": "炸酱面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-012",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  热干面  ",
+      "b": "热干面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-013",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  炒面  ",
+      "b": "炒面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-014",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  桂林米粉  ",
+      "b": "桂林米粉",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-015",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  螺蛳粉  ",
+      "b": "螺蛳粉",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-016",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  酸辣粉  ",
+      "b": "酸辣粉",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-017",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  水饺  ",
+      "b": "水饺",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-018",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  锅贴  ",
+      "b": "锅贴",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-019",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  馄饨  ",
+      "b": "馄饨",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-020",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  鸡蛋灌饼  ",
+      "b": "鸡蛋灌饼",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-021",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  肉夹馍  ",
+      "b": "肉夹馍",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-022",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  杂粮粥  ",
+      "b": "杂粮粥",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-023",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  小米粥  ",
+      "b": "小米粥",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-024",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  南瓜粥  ",
+      "b": "南瓜粥",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-025",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  蔬菜沙拉  ",
+      "b": "蔬菜沙拉",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-026",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  鸡胸肉杂粮饭  ",
+      "b": "鸡胸肉杂粮饭",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-027",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  金枪鱼三明治  ",
+      "b": "金枪鱼三明治",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-028",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  鸡蛋蔬菜卷  ",
+      "b": "鸡蛋蔬菜卷",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-029",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  披萨  ",
+      "b": "披萨",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-030",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  炸鸡套餐  ",
+      "b": "炸鸡套餐",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-031",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  牛奶  ",
+      "b": "牛奶",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-032",
+      "group": "seed-normalization",
+      "scenario": "eat",
+      "a": "  酸奶  ",
+      "b": "酸奶",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-033",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  番茄炒蛋  ",
+      "b": "番茄炒蛋",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-034",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  土豆炖牛肉  ",
+      "b": "土豆炖牛肉",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-035",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  红烧排骨  ",
+      "b": "红烧排骨",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-036",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  香菇滑鸡  ",
+      "b": "香菇滑鸡",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-037",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  青椒炒蛋  ",
+      "b": "青椒炒蛋",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-038",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  酸辣土豆丝  ",
+      "b": "酸辣土豆丝",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-039",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  蒜蓉西兰花  ",
+      "b": "蒜蓉西兰花",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-040",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  手撕包菜  ",
+      "b": "手撕包菜",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-041",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  宫保鸡丁  ",
+      "b": "宫保鸡丁",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-042",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  鱼香肉丝  ",
+      "b": "鱼香肉丝",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-043",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  麻婆豆腐  ",
+      "b": "麻婆豆腐",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-044",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  回锅肉  ",
+      "b": "回锅肉",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-045",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  拍黄瓜  ",
+      "b": "拍黄瓜",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-046",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  凉拌木耳  ",
+      "b": "凉拌木耳",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-047",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  小葱拌豆腐  ",
+      "b": "小葱拌豆腐",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-048",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  凉拌三丝  ",
+      "b": "凉拌三丝",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-049",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  紫菜蛋花汤  ",
+      "b": "紫菜蛋花汤",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-050",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  冬瓜排骨汤  ",
+      "b": "冬瓜排骨汤",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-051",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  玉米排骨汤  ",
+      "b": "玉米排骨汤",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-052",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  菌菇豆腐汤  ",
+      "b": "菌菇豆腐汤",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-053",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  鸡蛋羹  ",
+      "b": "鸡蛋羹",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-054",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  鸡蛋饼  ",
+      "b": "鸡蛋饼",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-055",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  番茄鸡蛋面  ",
+      "b": "番茄鸡蛋面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-056",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  青菜鸡蛋面  ",
+      "b": "青菜鸡蛋面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-057",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  小米粥  ",
+      "b": "小米粥",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-058",
+      "group": "seed-normalization",
+      "scenario": "cook",
+      "a": "  南瓜粥  ",
+      "b": "南瓜粥",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-059",
+      "group": "seed-normalization",
+      "scenario": "restaurant",
+      "a": "  海底捞  ",
+      "b": "海底捞",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-060",
+      "group": "seed-normalization",
+      "scenario": "restaurant",
+      "a": "  呷哺呷哺  ",
+      "b": "呷哺呷哺",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-061",
+      "group": "seed-normalization",
+      "scenario": "restaurant",
+      "a": "  木屋烧烤  ",
+      "b": "木屋烧烤",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-062",
+      "group": "seed-normalization",
+      "scenario": "restaurant",
+      "a": "  很久以前羊肉串  ",
+      "b": "很久以前羊肉串",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-063",
+      "group": "seed-normalization",
+      "scenario": "restaurant",
+      "a": "  西贝莜面村  ",
+      "b": "西贝莜面村",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-064",
+      "group": "seed-normalization",
+      "scenario": "restaurant",
+      "a": "  外婆家  ",
+      "b": "外婆家",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-065",
+      "group": "seed-normalization",
+      "scenario": "restaurant",
+      "a": "  必胜客  ",
+      "b": "必胜客",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-066",
+      "group": "seed-normalization",
+      "scenario": "restaurant",
+      "a": "  萨莉亚  ",
+      "b": "萨莉亚",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-067",
+      "group": "seed-normalization",
+      "scenario": "restaurant",
+      "a": "  肯德基  ",
+      "b": "肯德基",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-068",
+      "group": "seed-normalization",
+      "scenario": "restaurant",
+      "a": "  麦当劳  ",
+      "b": "麦当劳",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-069",
+      "group": "seed-normalization",
+      "scenario": "restaurant",
+      "a": "  比格比萨  ",
+      "b": "比格比萨",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-070",
+      "group": "seed-normalization",
+      "scenario": "restaurant",
+      "a": "  汉巴味德  ",
+      "b": "汉巴味德",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-071",
+      "group": "curated-alias",
+      "scenario": "eat",
+      "a": "黄焖鸡饭",
+      "b": "黄焖鸡米饭",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-072",
+      "group": "unsupported-food-variant",
+      "scenario": "eat",
+      "a": "牛肉拉面",
+      "b": "牛肉面",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-073",
+      "group": "curated-alias",
+      "scenario": "eat",
+      "a": "小笼包子",
+      "b": "小笼包",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-074",
+      "group": "curated-alias",
+      "scenario": "eat",
+      "a": "煎饼馃子",
+      "b": "煎饼果子",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-075",
+      "group": "curated-alias",
+      "scenario": "eat",
+      "a": "松花蛋瘦肉粥",
+      "b": "皮蛋瘦肉粥",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-076",
+      "group": "curated-alias",
+      "scenario": "eat",
+      "a": "豆漿",
+      "b": "豆浆",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-077",
+      "group": "ambiguous-food-wording",
+      "scenario": "eat",
+      "a": "豆乳",
+      "b": "豆奶",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-078",
+      "group": "curated-alias",
+      "scenario": "eat",
+      "a": "炸醬面",
+      "b": "炸酱面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-079",
+      "group": "curated-alias",
+      "scenario": "eat",
+      "a": "螺狮粉",
+      "b": "螺蛳粉",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-080",
+      "group": "curated-alias",
+      "scenario": "eat",
+      "a": "云吞",
+      "b": "馄饨",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-081",
+      "group": "curated-alias",
+      "scenario": "eat",
+      "a": "餛飩",
+      "b": "馄饨",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-082",
+      "group": "curated-alias",
+      "scenario": "eat",
+      "a": "肉夾馍",
+      "b": "肉夹馍",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-083",
+      "group": "curated-alias",
+      "scenario": "eat",
+      "a": "蔬菜色拉",
+      "b": "蔬菜沙拉",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-084",
+      "group": "curated-alias",
+      "scenario": "eat",
+      "a": "比萨",
+      "b": "披萨",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-085",
+      "group": "curated-alias",
+      "scenario": "eat",
+      "a": "匹萨",
+      "b": "披萨",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-086",
+      "group": "curated-alias",
+      "scenario": "eat",
+      "a": "酸乳",
+      "b": "酸奶",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-087",
+      "group": "curated-alias",
+      "scenario": "cook",
+      "a": "西红柿炒鸡蛋",
+      "b": "番茄炒蛋",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-088",
+      "group": "curated-alias",
+      "scenario": "cook",
+      "a": "西红柿炒蛋",
+      "b": "番茄炒蛋",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-089",
+      "group": "curated-alias",
+      "scenario": "cook",
+      "a": "番茄炒鸡蛋",
+      "b": "番茄炒蛋",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-090",
+      "group": "curated-alias",
+      "scenario": "cook",
+      "a": "马铃薯炖牛肉",
+      "b": "土豆炖牛肉",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-091",
+      "group": "curated-alias",
+      "scenario": "cook",
+      "a": "青椒炒鸡蛋",
+      "b": "青椒炒蛋",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-092",
+      "group": "curated-alias",
+      "scenario": "cook",
+      "a": "酸辣马铃薯丝",
+      "b": "酸辣土豆丝",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-093",
+      "group": "curated-alias",
+      "scenario": "cook",
+      "a": "手撕圆白菜",
+      "b": "手撕包菜",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-094",
+      "group": "curated-alias",
+      "scenario": "cook",
+      "a": "宫保鸡肉丁",
+      "b": "宫保鸡丁",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-095",
+      "group": "curated-alias",
+      "scenario": "cook",
+      "a": "木耳凉拌",
+      "b": "凉拌木耳",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-096",
+      "group": "curated-alias",
+      "scenario": "cook",
+      "a": "紫菜鸡蛋汤",
+      "b": "紫菜蛋花汤",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-097",
+      "group": "curated-alias",
+      "scenario": "cook",
+      "a": "蒸蛋羹",
+      "b": "鸡蛋羹",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-098",
+      "group": "curated-alias",
+      "scenario": "cook",
+      "a": "西红柿鸡蛋面",
+      "b": "番茄鸡蛋面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-099",
+      "group": "curated-alias",
+      "scenario": "cook",
+      "a": "番茄蛋面",
+      "b": "番茄鸡蛋面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-100",
+      "group": "curated-alias",
+      "scenario": "cook",
+      "a": "青菜蛋面",
+      "b": "青菜鸡蛋面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-101",
+      "group": "curated-alias",
+      "scenario": "restaurant",
+      "a": "Pizza Hut",
+      "b": "必胜客",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-102",
+      "group": "curated-alias",
+      "scenario": "restaurant",
+      "a": "KFC",
+      "b": "肯德基",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-103",
+      "group": "curated-alias",
+      "scenario": "restaurant",
+      "a": "McDonald's",
+      "b": "麦当劳",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-104",
+      "group": "curated-alias",
+      "scenario": "restaurant",
+      "a": "McDonalds",
+      "b": "麦当劳",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-105",
+      "group": "curated-alias",
+      "scenario": "restaurant",
+      "a": "比格披萨",
+      "b": "比格比萨",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-106",
+      "group": "curated-alias",
+      "scenario": "cook",
+      "a": "西红柿鸡蛋汤",
+      "b": "番茄鸡蛋汤",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-107",
+      "group": "curated-alias",
+      "scenario": "cook",
+      "a": "番茄蛋汤",
+      "b": "番茄鸡蛋汤",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-108",
+      "group": "curated-alias",
+      "scenario": "cook",
+      "a": "西红柿蛋汤",
+      "b": "番茄鸡蛋汤",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-109",
+      "group": "curated-alias",
+      "scenario": "eat",
+      "a": "西红柿鸡蛋盖饭",
+      "b": "番茄鸡蛋盖饭",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-110",
+      "group": "curated-alias",
+      "scenario": "eat",
+      "a": "番茄炒蛋盖饭",
+      "b": "番茄鸡蛋盖饭",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-111",
+      "group": "curated-alias",
+      "scenario": "eat",
+      "a": "西红柿炒鸡蛋盖饭",
+      "b": "番茄鸡蛋盖饭",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-112",
+      "group": "unsupported-food-variant",
+      "scenario": "eat",
+      "a": "鸡肉拉面",
+      "b": "鸡肉面",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-113",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "黄焖鸡米饭少油",
+      "b": "黄焖鸡米饭",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-114",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "牛肉面（多油）",
+      "b": "牛肉面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-115",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "小笼包少糖",
+      "b": "小笼包",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-116",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "煎饼果子（多醋）",
+      "b": "煎饼果子",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-117",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "皮蛋瘦肉粥微辣",
+      "b": "皮蛋瘦肉粥",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-118",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "汉堡套餐（不辣）",
+      "b": "汉堡套餐",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-119",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "豆浆（少糖）",
+      "b": "豆浆",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-120",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "豆奶（无糖）",
+      "b": "豆奶",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-121",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "宫保鸡丁盖饭重辣",
+      "b": "宫保鸡丁盖饭",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-122",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "红烧肉盖饭（特辣）",
+      "b": "红烧肉盖饭",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-123",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "炸酱面加辣",
+      "b": "炸酱面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-124",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "热干面（少盐）",
+      "b": "热干面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-125",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "炒面少油",
+      "b": "炒面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-126",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "桂林米粉（多油）",
+      "b": "桂林米粉",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-127",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "螺蛳粉少糖",
+      "b": "螺蛳粉",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-128",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "酸辣粉（多醋）",
+      "b": "酸辣粉",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-129",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "水饺微辣",
+      "b": "水饺",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-130",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "锅贴（不辣）",
+      "b": "锅贴",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-131",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "馄饨少辣",
+      "b": "馄饨",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-132",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "鸡蛋灌饼（中辣）",
+      "b": "鸡蛋灌饼",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-133",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "肉夹馍重辣",
+      "b": "肉夹馍",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-134",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "杂粮粥（特辣）",
+      "b": "杂粮粥",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-135",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "小米粥加辣",
+      "b": "小米粥",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-136",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "南瓜粥（少盐）",
+      "b": "南瓜粥",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-137",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "蔬菜沙拉少油",
+      "b": "蔬菜沙拉",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-138",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "鸡胸肉杂粮饭（多油）",
+      "b": "鸡胸肉杂粮饭",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-139",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "金枪鱼三明治少糖",
+      "b": "金枪鱼三明治",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-140",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "鸡蛋蔬菜卷（多醋）",
+      "b": "鸡蛋蔬菜卷",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-141",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "披萨微辣",
+      "b": "披萨",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-142",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "炸鸡套餐（不辣）",
+      "b": "炸鸡套餐",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-143",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "牛奶（多糖）",
+      "b": "牛奶",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-144",
+      "group": "bounded-seasoning",
+      "scenario": "eat",
+      "a": "酸奶（少糖）",
+      "b": "酸奶",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-145",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "番茄炒蛋重辣",
+      "b": "番茄炒蛋",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-146",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "土豆炖牛肉（特辣）",
+      "b": "土豆炖牛肉",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-147",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "红烧排骨加辣",
+      "b": "红烧排骨",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-148",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "香菇滑鸡（少盐）",
+      "b": "香菇滑鸡",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-149",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "青椒炒蛋少油",
+      "b": "青椒炒蛋",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-150",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "酸辣土豆丝（多油）",
+      "b": "酸辣土豆丝",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-151",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "蒜蓉西兰花少糖",
+      "b": "蒜蓉西兰花",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-152",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "手撕包菜（多醋）",
+      "b": "手撕包菜",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-153",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "宫保鸡丁微辣",
+      "b": "宫保鸡丁",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-154",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "鱼香肉丝（不辣）",
+      "b": "鱼香肉丝",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-155",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "麻婆豆腐少辣",
+      "b": "麻婆豆腐",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-156",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "回锅肉（中辣）",
+      "b": "回锅肉",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-157",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "拍黄瓜重辣",
+      "b": "拍黄瓜",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-158",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "凉拌木耳（特辣）",
+      "b": "凉拌木耳",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-159",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "小葱拌豆腐加辣",
+      "b": "小葱拌豆腐",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-160",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "凉拌三丝（少盐）",
+      "b": "凉拌三丝",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-161",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "紫菜蛋花汤少油",
+      "b": "紫菜蛋花汤",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-162",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "冬瓜排骨汤（多油）",
+      "b": "冬瓜排骨汤",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-163",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "玉米排骨汤少糖",
+      "b": "玉米排骨汤",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-164",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "菌菇豆腐汤（多醋）",
+      "b": "菌菇豆腐汤",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-165",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "鸡蛋羹微辣",
+      "b": "鸡蛋羹",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-166",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "鸡蛋饼（不辣）",
+      "b": "鸡蛋饼",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-167",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "番茄鸡蛋面少辣",
+      "b": "番茄鸡蛋面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-168",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "青菜鸡蛋面（中辣）",
+      "b": "青菜鸡蛋面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-169",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "小米粥重辣",
+      "b": "小米粥",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-170",
+      "group": "bounded-seasoning",
+      "scenario": "cook",
+      "a": "南瓜粥（特辣）",
+      "b": "南瓜粥",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-171",
+      "group": "optional-addition",
+      "scenario": "eat",
+      "a": "牛肉面加蛋",
+      "b": "牛肉面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-172",
+      "group": "optional-addition",
+      "scenario": "eat",
+      "a": "牛肉面加鸡蛋",
+      "b": "牛肉面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-173",
+      "group": "optional-addition",
+      "scenario": "eat",
+      "a": "牛肉面加青菜",
+      "b": "牛肉面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-174",
+      "group": "optional-addition",
+      "scenario": "eat",
+      "a": "牛肉面加肉",
+      "b": "牛肉面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-175",
+      "group": "optional-addition",
+      "scenario": "eat",
+      "a": "炸酱面加蛋",
+      "b": "炸酱面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-176",
+      "group": "optional-addition",
+      "scenario": "eat",
+      "a": "热干面加葱",
+      "b": "热干面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-177",
+      "group": "optional-addition",
+      "scenario": "eat",
+      "a": "炒面加鸡肉",
+      "b": "炒面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-178",
+      "group": "optional-addition",
+      "scenario": "eat",
+      "a": "桂林米粉加牛肉",
+      "b": "桂林米粉",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-179",
+      "group": "optional-addition",
+      "scenario": "eat",
+      "a": "螺蛳粉加蛋",
+      "b": "螺蛳粉",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-180",
+      "group": "optional-addition",
+      "scenario": "eat",
+      "a": "酸辣粉加青菜",
+      "b": "酸辣粉",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-181",
+      "group": "optional-addition",
+      "scenario": "eat",
+      "a": "黄焖鸡米饭加青菜",
+      "b": "黄焖鸡米饭",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-182",
+      "group": "optional-addition",
+      "scenario": "eat",
+      "a": "馄饨加香菜",
+      "b": "馄饨",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-183",
+      "group": "optional-addition",
+      "scenario": "cook",
+      "a": "番茄炒蛋加肉",
+      "b": "番茄炒蛋",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-184",
+      "group": "optional-addition",
+      "scenario": "cook",
+      "a": "西红柿炒鸡蛋加肉",
+      "b": "番茄炒蛋",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-185",
+      "group": "optional-addition",
+      "scenario": "cook",
+      "a": "青椒炒蛋加肉",
+      "b": "青椒炒蛋",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-186",
+      "group": "optional-addition",
+      "scenario": "cook",
+      "a": "番茄鸡蛋面加蛋",
+      "b": "番茄鸡蛋面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-187",
+      "group": "optional-addition",
+      "scenario": "cook",
+      "a": "青菜鸡蛋面加鸡肉",
+      "b": "青菜鸡蛋面",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-188",
+      "group": "optional-addition",
+      "scenario": "cook",
+      "a": "菌菇豆腐汤加青菜",
+      "b": "菌菇豆腐汤",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-189",
+      "group": "optional-addition",
+      "scenario": "cook",
+      "a": "紫菜蛋花汤加豆腐",
+      "b": "紫菜蛋花汤",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-190",
+      "group": "optional-addition",
+      "scenario": "cook",
+      "a": "麻婆豆腐加牛肉",
+      "b": "麻婆豆腐",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-191",
+      "group": "protected-distinct",
+      "scenario": "cook",
+      "a": "番茄炒蛋",
+      "b": "番茄鸡蛋汤",
+      "expected": "different"
+    },
+    {
+      "id": "LR-192",
+      "group": "protected-distinct",
+      "scenario": "cook",
+      "a": "西红柿炒鸡蛋",
+      "b": "西红柿鸡蛋汤",
+      "expected": "different"
+    },
+    {
+      "id": "LR-193",
+      "group": "protected-distinct",
+      "scenario": "eat",
+      "a": "番茄炒蛋",
+      "b": "番茄鸡蛋盖饭",
+      "expected": "different"
+    },
+    {
+      "id": "LR-194",
+      "group": "protected-distinct",
+      "scenario": "cook",
+      "a": "番茄炒蛋",
+      "b": "番茄鸡蛋面",
+      "expected": "different"
+    },
+    {
+      "id": "LR-195",
+      "group": "protected-distinct",
+      "scenario": "eat",
+      "a": "番茄鸡蛋面",
+      "b": "番茄鸡蛋盖饭",
+      "expected": "different"
+    },
+    {
+      "id": "LR-196",
+      "group": "protected-distinct",
+      "scenario": "cook",
+      "a": "番茄鸡蛋汤",
+      "b": "番茄鸡蛋面",
+      "expected": "different"
+    },
+    {
+      "id": "LR-197",
+      "group": "protected-distinct",
+      "scenario": "eat",
+      "a": "牛肉面",
+      "b": "鸡肉面",
+      "expected": "different"
+    },
+    {
+      "id": "LR-198",
+      "group": "protected-distinct",
+      "scenario": "eat",
+      "a": "牛肉面加蛋",
+      "b": "鸡肉面加蛋",
+      "expected": "different"
+    },
+    {
+      "id": "LR-199",
+      "group": "protected-distinct",
+      "scenario": "eat",
+      "a": "豆浆",
+      "b": "豆奶",
+      "expected": "different"
+    },
+    {
+      "id": "LR-200",
+      "group": "ambiguous-food-wording",
+      "scenario": "eat",
+      "a": "豆漿",
+      "b": "豆乳",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-201",
+      "group": "protected-distinct",
+      "scenario": "eat",
+      "a": "豆浆少糖",
+      "b": "豆奶少糖",
+      "expected": "different"
+    },
+    {
+      "id": "LR-202",
+      "group": "protected-distinct",
+      "scenario": "eat",
+      "a": "小笼包",
+      "b": "水饺",
+      "expected": "different"
+    },
+    {
+      "id": "LR-203",
+      "group": "protected-distinct",
+      "scenario": "eat",
+      "a": "馄饨",
+      "b": "锅贴",
+      "expected": "different"
+    },
+    {
+      "id": "LR-204",
+      "group": "protected-distinct",
+      "scenario": "eat",
+      "a": "皮蛋瘦肉粥",
+      "b": "杂粮粥",
+      "expected": "different"
+    },
+    {
+      "id": "LR-205",
+      "group": "protected-distinct",
+      "scenario": "eat",
+      "a": "牛奶",
+      "b": "酸奶",
+      "expected": "different"
+    },
+    {
+      "id": "LR-206",
+      "group": "protected-distinct",
+      "scenario": "cook",
+      "a": "番茄炒蛋",
+      "b": "青椒炒蛋",
+      "expected": "different"
+    },
+    {
+      "id": "LR-207",
+      "group": "protected-distinct",
+      "scenario": "cook",
+      "a": "紫菜蛋花汤",
+      "b": "菌菇豆腐汤",
+      "expected": "different"
+    },
+    {
+      "id": "LR-208",
+      "group": "protected-distinct",
+      "scenario": "cook",
+      "a": "土豆炖牛肉",
+      "b": "香菇滑鸡",
+      "expected": "different"
+    },
+    {
+      "id": "LR-209",
+      "group": "protected-distinct",
+      "scenario": "cook",
+      "a": "红烧排骨",
+      "b": "冬瓜排骨汤",
+      "expected": "different"
+    },
+    {
+      "id": "LR-210",
+      "group": "protected-distinct",
+      "scenario": "cook",
+      "a": "鸡蛋饼",
+      "b": "鸡蛋羹",
+      "expected": "different"
+    },
+    {
+      "id": "LR-211",
+      "group": "protected-distinct",
+      "scenario": "cook",
+      "a": "麻婆豆腐",
+      "b": "小葱拌豆腐",
+      "expected": "different"
+    },
+    {
+      "id": "LR-212",
+      "group": "protected-distinct",
+      "scenario": "cook",
+      "a": "拍黄瓜",
+      "b": "凉拌木耳",
+      "expected": "different"
+    },
+    {
+      "id": "LR-213",
+      "group": "protected-distinct",
+      "scenario": "eat",
+      "a": "炸鸡套餐",
+      "b": "汉堡套餐",
+      "expected": "different"
+    },
+    {
+      "id": "LR-214",
+      "group": "protected-distinct",
+      "scenario": "eat",
+      "a": "鸡蛋灌饼",
+      "b": "鸡蛋饼",
+      "expected": "different"
+    },
+    {
+      "id": "LR-215",
+      "group": "protected-distinct",
+      "scenario": "eat",
+      "a": "红烧肉盖饭",
+      "b": "宫保鸡丁盖饭",
+      "expected": "different"
+    },
+    {
+      "id": "LR-216",
+      "group": "protected-distinct",
+      "scenario": "eat",
+      "a": "宫保鸡丁",
+      "b": "宫保鸡丁盖饭",
+      "expected": "different"
+    },
+    {
+      "id": "LR-217",
+      "group": "protected-distinct",
+      "scenario": "eat",
+      "a": "炸酱面",
+      "b": "热干面",
+      "expected": "different"
+    },
+    {
+      "id": "LR-218",
+      "group": "protected-distinct",
+      "scenario": "eat",
+      "a": "桂林米粉",
+      "b": "螺蛳粉",
+      "expected": "different"
+    },
+    {
+      "id": "LR-219",
+      "group": "protected-distinct",
+      "scenario": "eat",
+      "a": "蔬菜沙拉",
+      "b": "鸡蛋蔬菜卷",
+      "expected": "different"
+    },
+    {
+      "id": "LR-220",
+      "group": "protected-distinct",
+      "scenario": "eat",
+      "a": "金枪鱼三明治",
+      "b": "鸡胸肉杂粮饭",
+      "expected": "different"
+    },
+    {
+      "id": "LR-221",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "海底捞（东街店）",
+      "b": "海底捞（西街店）",
+      "expected": "different"
+    },
+    {
+      "id": "LR-222",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "海底捞",
+      "b": "海底捞东街店",
+      "expected": "different"
+    },
+    {
+      "id": "LR-223",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "呷哺呷哺（东街店）",
+      "b": "呷哺呷哺（西街店）",
+      "expected": "different"
+    },
+    {
+      "id": "LR-224",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "呷哺呷哺",
+      "b": "呷哺呷哺东街店",
+      "expected": "different"
+    },
+    {
+      "id": "LR-225",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "木屋烧烤（东街店）",
+      "b": "木屋烧烤（西街店）",
+      "expected": "different"
+    },
+    {
+      "id": "LR-226",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "木屋烧烤",
+      "b": "木屋烧烤东街店",
+      "expected": "different"
+    },
+    {
+      "id": "LR-227",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "很久以前羊肉串（东街店）",
+      "b": "很久以前羊肉串（西街店）",
+      "expected": "different"
+    },
+    {
+      "id": "LR-228",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "很久以前羊肉串",
+      "b": "很久以前羊肉串东街店",
+      "expected": "different"
+    },
+    {
+      "id": "LR-229",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "西贝莜面村（东街店）",
+      "b": "西贝莜面村（西街店）",
+      "expected": "different"
+    },
+    {
+      "id": "LR-230",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "西贝莜面村",
+      "b": "西贝莜面村东街店",
+      "expected": "different"
+    },
+    {
+      "id": "LR-231",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "外婆家（东街店）",
+      "b": "外婆家（西街店）",
+      "expected": "different"
+    },
+    {
+      "id": "LR-232",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "外婆家",
+      "b": "外婆家东街店",
+      "expected": "different"
+    },
+    {
+      "id": "LR-233",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "必胜客（东街店）",
+      "b": "必胜客（西街店）",
+      "expected": "different"
+    },
+    {
+      "id": "LR-234",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "必胜客",
+      "b": "必胜客东街店",
+      "expected": "different"
+    },
+    {
+      "id": "LR-235",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "萨莉亚（东街店）",
+      "b": "萨莉亚（西街店）",
+      "expected": "different"
+    },
+    {
+      "id": "LR-236",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "萨莉亚",
+      "b": "萨莉亚东街店",
+      "expected": "different"
+    },
+    {
+      "id": "LR-237",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "肯德基（东街店）",
+      "b": "肯德基（西街店）",
+      "expected": "different"
+    },
+    {
+      "id": "LR-238",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "肯德基",
+      "b": "肯德基东街店",
+      "expected": "different"
+    },
+    {
+      "id": "LR-239",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "麦当劳（东街店）",
+      "b": "麦当劳（西街店）",
+      "expected": "different"
+    },
+    {
+      "id": "LR-240",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "麦当劳",
+      "b": "麦当劳东街店",
+      "expected": "different"
+    },
+    {
+      "id": "LR-241",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "比格比萨（东街店）",
+      "b": "比格比萨（西街店）",
+      "expected": "different"
+    },
+    {
+      "id": "LR-242",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "比格比萨",
+      "b": "比格比萨东街店",
+      "expected": "different"
+    },
+    {
+      "id": "LR-243",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "汉巴味德（东街店）",
+      "b": "汉巴味德（西街店）",
+      "expected": "different"
+    },
+    {
+      "id": "LR-244",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "汉巴味德",
+      "b": "汉巴味德东街店",
+      "expected": "different"
+    },
+    {
+      "id": "LR-245",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "KFC（东街店）",
+      "b": "肯德基东街店",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-246",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "海底捞（东街店）",
+      "b": "海底捞东街店",
+      "expected": "confirmed"
+    },
+    {
+      "id": "LR-247",
+      "group": "unsupported-modifier",
+      "scenario": "eat",
+      "a": "黄焖鸡米饭特色版",
+      "b": "黄焖鸡米饭",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-248",
+      "group": "unsupported-modifier",
+      "scenario": "eat",
+      "a": "牛肉面加香蕉",
+      "b": "牛肉面",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-249",
+      "group": "unsupported-modifier",
+      "scenario": "eat",
+      "a": "小笼包换鸡肉",
+      "b": "小笼包",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-250",
+      "group": "unsupported-modifier",
+      "scenario": "eat",
+      "a": "煎饼果子（少油未知）",
+      "b": "煎饼果子",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-251",
+      "group": "unsupported-modifier",
+      "scenario": "eat",
+      "a": "皮蛋瘦肉粥特色版",
+      "b": "皮蛋瘦肉粥",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-252",
+      "group": "unsupported-modifier",
+      "scenario": "eat",
+      "a": "汉堡套餐加香蕉",
+      "b": "汉堡套餐",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-253",
+      "group": "unsupported-modifier",
+      "scenario": "eat",
+      "a": "豆浆换鸡肉",
+      "b": "豆浆",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-254",
+      "group": "unsupported-modifier",
+      "scenario": "eat",
+      "a": "豆奶（少油未知）",
+      "b": "豆奶",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-255",
+      "group": "unsupported-modifier",
+      "scenario": "eat",
+      "a": "宫保鸡丁盖饭特色版",
+      "b": "宫保鸡丁盖饭",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-256",
+      "group": "unsupported-modifier",
+      "scenario": "eat",
+      "a": "红烧肉盖饭加香蕉",
+      "b": "红烧肉盖饭",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-257",
+      "group": "unsupported-modifier",
+      "scenario": "eat",
+      "a": "炸酱面换鸡肉",
+      "b": "炸酱面",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-258",
+      "group": "unsupported-modifier",
+      "scenario": "eat",
+      "a": "热干面（少油未知）",
+      "b": "热干面",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-259",
+      "group": "unsupported-modifier",
+      "scenario": "eat",
+      "a": "炒面特色版",
+      "b": "炒面",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-260",
+      "group": "unsupported-modifier",
+      "scenario": "eat",
+      "a": "桂林米粉加香蕉",
+      "b": "桂林米粉",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-261",
+      "group": "unsupported-modifier",
+      "scenario": "eat",
+      "a": "螺蛳粉换鸡肉",
+      "b": "螺蛳粉",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-262",
+      "group": "unsupported-modifier",
+      "scenario": "eat",
+      "a": "酸辣粉（少油未知）",
+      "b": "酸辣粉",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-263",
+      "group": "unsupported-prefix",
+      "scenario": "eat",
+      "a": "家常牛肉面",
+      "b": "牛肉面",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-264",
+      "group": "unsupported-modifier",
+      "scenario": "cook",
+      "a": "西红柿炒鸡蛋特色版",
+      "b": "番茄炒蛋",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-265",
+      "group": "near-spelling",
+      "scenario": "eat",
+      "a": "螺丝粉",
+      "b": "螺蛳粉",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-266",
+      "group": "outside-vocabulary",
+      "scenario": "eat",
+      "a": "外星套餐",
+      "b": "牛肉面",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-267",
+      "group": "outside-vocabulary",
+      "scenario": "cook",
+      "a": "秘制神仙菜",
+      "b": "红烧排骨",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-268",
+      "group": "outside-vocabulary",
+      "scenario": "restaurant",
+      "a": "谜之小店",
+      "b": "肯德基",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-269",
+      "group": "outside-vocabulary",
+      "scenario": "eat",
+      "a": "Soup-Bowl",
+      "b": "Soup Bowl",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-270",
+      "group": "outside-vocabulary",
+      "scenario": "eat",
+      "a": "火星饭",
+      "b": "月亮面",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-271",
+      "group": "outside-vocabulary",
+      "scenario": "eat",
+      "a": "Apple pie",
+      "b": "Applepie",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-272",
+      "group": "outside-vocabulary",
+      "scenario": "cook",
+      "a": "汤!",
+      "b": "汤?",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-273",
+      "group": "outside-vocabulary",
+      "scenario": "eat",
+      "a": "主厨惊喜",
+      "b": "太空午餐",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-274",
+      "group": "outside-vocabulary",
+      "scenario": "restaurant",
+      "a": "A & B",
+      "b": "A and B",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-275",
+      "group": "outside-vocabulary",
+      "scenario": "restaurant",
+      "a": "沙漠旅馆",
+      "b": "星河食堂",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-276",
+      "group": "outside-vocabulary",
+      "scenario": "eat",
+      "a": "欢乐便当",
+      "b": "神秘招牌",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-277",
+      "group": "outside-vocabulary",
+      "scenario": "cook",
+      "a": "阿姨的拿手菜",
+      "b": "叔叔的拿手菜",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-278",
+      "group": "outside-vocabulary",
+      "scenario": "eat",
+      "a": "北极特饮",
+      "b": "南极特饮",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-279",
+      "group": "outside-vocabulary",
+      "scenario": "eat",
+      "a": "Golden Meal",
+      "b": "Gold Meal",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-280",
+      "group": "outside-vocabulary",
+      "scenario": "cook",
+      "a": "家庭招待",
+      "b": "家宴特别款",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-281",
+      "group": "outside-vocabulary",
+      "scenario": "eat",
+      "a": "新品一号",
+      "b": "季节限定款",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-282",
+      "group": "outside-vocabulary",
+      "scenario": "restaurant",
+      "a": "海洋餐吧",
+      "b": "山地食堂",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-283",
+      "group": "outside-vocabulary",
+      "scenario": "eat",
+      "a": "未来早餐",
+      "b": "过去晚餐",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-284",
+      "group": "outside-vocabulary",
+      "scenario": "cook",
+      "a": "蓝色意面",
+      "b": "紫色烤盘",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-285",
+      "group": "outside-vocabulary",
+      "scenario": "cook",
+      "a": "假期食谱",
+      "b": "节日菜单",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-286",
+      "group": "outside-vocabulary",
+      "scenario": "restaurant",
+      "a": "街角小馆（东街店）",
+      "b": "街角小馆（西街店）",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-287",
+      "group": "outside-vocabulary",
+      "scenario": "eat",
+      "a": "无名饭",
+      "b": "无名面",
+      "expected": "unknown"
+    }
+  ]
+}

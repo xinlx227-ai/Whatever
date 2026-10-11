@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/meal_repository.dart';
 import '../domain/meal.dart';
+import '../domain/local_recognition.dart';
 import '../domain/meal_preferences.dart';
 
 enum ReplacementChoice { redraw, exclude }
@@ -282,7 +283,6 @@ class MealController extends ChangeNotifier {
     String query = '',
     LibraryStatus status = LibraryStatus.active,
   }) {
-    final search = normalizedOptionName(query);
     return List.unmodifiable(
       _options.where(
         (option) =>
@@ -290,7 +290,7 @@ class MealController extends ChangeNotifier {
             !option.isDeleted &&
             (status == LibraryStatus.all ||
                 option.isActive == (status == LibraryStatus.active)) &&
-            normalizedOptionName(option.name).contains(search),
+            const LocalRecognition().matchesSearch(option, query),
       ),
     );
   }
@@ -306,6 +306,8 @@ class MealController extends ChangeNotifier {
     String? notes,
     bool confirmRestore = false,
     bool confirmSameFood = false,
+    bool allowUncertainDuplicate = false,
+    String? restoreOptionId,
   }) {
     // Snapshot mutable form input before entering the serialized write queue.
     final selectedPeriods = Set<MealPeriod>.of(periods);
@@ -321,6 +323,8 @@ class MealController extends ChangeNotifier {
         notes: notes,
         confirmRestore: confirmRestore,
         confirmSameFood: confirmSameFood,
+        allowUncertainDuplicate: allowUncertainDuplicate,
+        restoreOptionId: restoreOptionId,
       ),
     );
   }

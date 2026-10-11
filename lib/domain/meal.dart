@@ -78,6 +78,7 @@ class FoodOption {
     this.imagePath,
     this.address,
     this.notes,
+    this.recognitionId,
   }) : _categories = categories;
 
   final String id;
@@ -94,6 +95,7 @@ class FoodOption {
   final String? imagePath;
   final String? address;
   final String? notes;
+  final String? recognitionId;
 }
 
 enum LibraryStatus { active, inactive, all }
@@ -102,6 +104,7 @@ enum OptionMutationStatus {
   saved,
   unchanged,
   duplicate,
+  uncertainDuplicate,
   restorationRequired,
   renameConfirmationRequired,
   invalid,
@@ -109,11 +112,17 @@ enum OptionMutationStatus {
 }
 
 class OptionMutationResult {
-  const OptionMutationResult(this.status, {this.option, this.message});
+  const OptionMutationResult(
+    this.status, {
+    this.option,
+    this.message,
+    this.matches = const [],
+  });
 
   final OptionMutationStatus status;
   final FoodOption? option;
   final String? message;
+  final List<FoodOption> matches;
   bool get changed => status == OptionMutationStatus.saved;
   bool get succeeded => changed || status == OptionMutationStatus.unchanged;
 }

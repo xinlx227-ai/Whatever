@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:sqflite_common/sqlite_api.dart';
 
+import '../domain/local_recognition.dart';
 import '../domain/meal.dart';
 import '../domain/meal_preferences.dart';
 
@@ -29,7 +30,7 @@ class MealRepository {
     final database = await factory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-        version: 7,
+        version: 8,
         onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
         onCreate: (database, version) async {
           await database.execute('''
@@ -68,6 +69,7 @@ class MealRepository {
           await _addCategoryRegistry(database);
           await _addCardTutorialPreference(database);
           await _addCardCollectionTutorialPreference(database);
+          await _addRecognitionIdentity(database);
         },
         onUpgrade: (database, oldVersion, newVersion) async {
           if (oldVersion < 2) {
@@ -88,10 +90,56 @@ class MealRepository {
           if (oldVersion < 7) {
             await _addCardCollectionTutorialPreference(database);
           }
+          if (oldVersion < 8) {
+            await _addRecognitionIdentity(database);
+          }
         },
       ),
     );
     return MealRepository._(database, onConfirmationPhase);
+  }
+
+  static Future<void> _addRecognitionIdentity(DatabaseExecutor database) async {
+    await database.execute(
+      'ALTER TABLE options ADD COLUMN recognition_id TEXT',
+    );
+    const recognition = LocalRecognition();
+    final rows = await database.query('options');
+    for (final row in rows) {
+      final scenario = row['scenario']! as String;
+      final displayIdentity = recognition.identity(
+        row['name']! as String,
+        scenario,
+      );
+      String? identity;
+      // Built-in IDs are stronger identity evidence than legacy display edits,
+      // including names an earlier version accepted as a different dish.
+      if (row['is_builtin'] == 1) {
+        final seed = seedOptions
+            .where((value) => value.id == row['id'])
+            .firstOrNull;
+        if (seed != null && seed.scenario == scenario) {
+          identity = recognition.identity(seed.name, scenario);
+          // A recognized explicit branch of the same brand refines a legacy
+          // restaurant identity; treating it as the brand would merge places.
+          if (scenario == MealScenario.restaurant.name &&
+              identity != null &&
+              displayIdentity != null &&
+              displayIdentity.startsWith('$identity#branch:')) {
+            identity = displayIdentity;
+          }
+        }
+      }
+      identity ??= displayIdentity;
+      if (identity != null) {
+        await database.update(
+          'options',
+          {'recognition_id': identity},
+          where: 'id = ?',
+          whereArgs: [row['id']],
+        );
+      }
+    }
   }
 
   static Future<void> _addCategoryRegistry(DatabaseExecutor database) async {
@@ -482,6 +530,7 @@ class MealRepository {
           imagePath: row['image_path'] as String?,
           address: row['address'] as String?,
           notes: row['notes'] as String?,
+          recognitionId: row['recognition_id'] as String?,
           periods: Set.unmodifiable(
             periods
                 .where((period) => period['option_id'] == row['id'])
@@ -506,15 +555,32 @@ class MealRepository {
     String? notes,
     bool confirmRestore = false,
     bool confirmSameFood = false,
+    bool allowUncertainDuplicate = false,
+    String? restoreOptionId,
   }) => _database.transaction((transaction) async {
     final displayName = name.trim();
+    if (!MealScenario.values.any((value) => value.name == scenario)) {
+      return const OptionMutationResult(
+        OptionMutationStatus.invalid,
+        message: '请选择有效的场景。',
+      );
+    }
     final registered = await _categories(transaction);
     final scopedCategories = registered.where(
       (value) => value.scenario.name == scenario,
     );
+    const recognition = LocalRecognition();
+    final inferredCategoryId = recognition.inferCategoryId(
+      displayName,
+      MealScenario.fromKey(scenario),
+      scopedCategories.toList(),
+    );
     final displayCategory =
         category?.trim() ??
-        scopedCategories.where((value) => value.isFallback).firstOrNull?.name;
+        scopedCategories
+            .where((value) => value.id == inferredCategoryId)
+            .firstOrNull
+            ?.name;
     if (displayName.isEmpty ||
         periods.isEmpty ||
         displayCategory == null ||
@@ -555,38 +621,103 @@ class MealRepository {
         );
       }
     }
-    FoodOption? duplicate;
     final normalized = normalizedOptionName(displayName);
-    for (final option in options) {
-      if (option.id != id &&
-          option.scenario == scenario &&
-          normalizedOptionName(option.name) == normalized) {
-        duplicate = option;
-        break;
-      }
-    }
-    if (duplicate != null) {
-      if (id == null && duplicate.isDeleted && !duplicate.isBuiltIn) {
-        if (!confirmRestore) {
-          return OptionMutationResult(
-            OptionMutationStatus.restorationRequired,
-            option: duplicate,
-            message: '已删除的选项中有同名餐食，是否恢复原选项？',
-          );
-        }
-        original = duplicate;
-      } else {
+    final nameChanged =
+        original == null || normalizedOptionName(original.name) != normalized;
+    final enteredIdentity = recognition.identity(displayName, scenario);
+    NameMatch? renameMatch;
+    if (id != null && nameChanged) {
+      renameMatch = recognition.compare(
+        displayName,
+        original!.name,
+        scenario,
+        identityA: enteredIdentity,
+        identityB: original.recognitionId,
+      );
+      if (renameMatch == NameMatch.different) {
         return OptionMutationResult(
-          OptionMutationStatus.duplicate,
-          option: duplicate,
-          message: duplicate.isActive && !duplicate.isDeleted
-              ? '已有同名餐食，请查看已有选项。'
-              : '已有同名餐食，可查看并重新启用或恢复原选项。',
+          OptionMutationStatus.invalid,
+          option: original,
+          message: scenario == MealScenario.restaurant.name
+              ? '新名称是不同的餐厅，请创建单独的选项以保留原有足迹。'
+              : '新名称是不同的餐食，请创建单独的选项以保留原有足迹。',
         );
       }
     }
+    final confirmed = <FoodOption>[];
+    final uncertain = <FoodOption>[];
+    // Existing alias collisions remain separate identities. Editing their
+    // unchanged name or other fields must remain possible.
+    if (nameChanged) {
+      for (final option in options) {
+        if (option.id == id || option.scenario != scenario) continue;
+        final match = recognition.compare(
+          displayName,
+          option.name,
+          scenario,
+          identityA: original?.recognitionId ?? enteredIdentity,
+          identityB: option.recognitionId,
+        );
+        if (match == NameMatch.confirmed) confirmed.add(option);
+        if (match == NameMatch.uncertain) uncertain.add(option);
+      }
+    }
+    if (confirmed.isNotEmpty) {
+      final matches = List<FoodOption>.unmodifiable(confirmed);
+      final onlyMatch = matches.length == 1 ? matches.single : null;
+      final addressConflict =
+          scenario == MealScenario.restaurant.name &&
+          address != null &&
+          matches.any(
+            (value) =>
+                normalizedOptionName(value.address ?? '') !=
+                normalizedOptionName(address),
+          );
+      final branchGuidance = addressConflict
+          ? '名称相同但地址不同，地址不能确定是否为不同分店；如需添加分店，请在名称中注明，例如街角小馆（东街店）。'
+          : null;
+      if (id == null &&
+          matches.every((value) => value.isDeleted && !value.isBuiltIn)) {
+        final selected = restoreOptionId == null
+            ? onlyMatch
+            : matches.where((value) => value.id == restoreOptionId).firstOrNull;
+        if (!confirmRestore || selected == null) {
+          return OptionMutationResult(
+            OptionMutationStatus.restorationRequired,
+            option: onlyMatch,
+            matches: matches,
+            message:
+                branchGuidance ??
+                (matches.length == 1
+                    ? '已有相同的已删除选项，恢复后会保存本表单的名称、分类、时段等内容，并保留原有足迹。'
+                    : '已有多个相同的已删除选项，请选择要恢复的原选项；恢复后会保存本表单内容并保留原有足迹。'),
+          );
+        }
+        original = selected;
+      } else {
+        return OptionMutationResult(
+          OptionMutationStatus.duplicate,
+          option: onlyMatch,
+          matches: matches,
+          message:
+              branchGuidance ??
+              (matches.any((value) => value.isActive && !value.isDeleted)
+                  ? '已有相同餐食，请查看已有选项。'
+                  : '已有相同餐食，请查看已有选项，可重新启用已停用的选项。'),
+        );
+      }
+    }
+    if (uncertain.isNotEmpty && !allowUncertainDuplicate) {
+      return OptionMutationResult(
+        OptionMutationStatus.uncertainDuplicate,
+        option: uncertain.length == 1 ? uncertain.single : null,
+        matches: List.unmodifiable(uncertain),
+        message: '可能已有类似餐食，请查看已有选项，或确认后仍然保存。',
+      );
+    }
     if (id != null &&
-        normalizedOptionName(original!.name) != normalized &&
+        nameChanged &&
+        renameMatch != NameMatch.confirmed &&
         !confirmSameFood) {
       return OptionMutationResult(
         OptionMutationStatus.renameConfirmationRequired,
@@ -619,6 +750,7 @@ class MealRepository {
       notes: scenario == MealScenario.restaurant.name
           ? _optionalText(notes, original?.notes)
           : null,
+      recognitionId: original?.recognitionId ?? enteredIdentity,
     );
     if (original != null && _sameOption(original, option)) {
       return OptionMutationResult(
@@ -637,6 +769,7 @@ class MealRepository {
       'image_path': option.imagePath,
       'address': option.address,
       'notes': option.notes,
+      'recognition_id': option.recognitionId,
     };
     if (original == null) {
       await transaction.insert('options', {'id': option.id, ...values});

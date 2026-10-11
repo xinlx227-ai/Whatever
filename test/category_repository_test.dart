@@ -485,8 +485,14 @@ void main() {
       );
       final inspector = await inspect();
       try {
-        expect(await inspector.getVersion(), 7);
-        expect(await inspector.query('options'), beforeOptions);
+        expect(await inspector.getVersion(), 8);
+        expect(
+          await inspector.query(
+            'options',
+            columns: beforeOptions.first.keys.toList(),
+          ),
+          beforeOptions,
+        );
         expect(await inspector.query('option_categories'), beforeMemberships);
         expect(await inspector.rawQuery('PRAGMA foreign_key_check'), isEmpty);
       } finally {
@@ -494,6 +500,12 @@ void main() {
       }
       final reopened = await reopen();
       expect((await reopened.options()), hasLength(3));
+      expect(
+        (await reopened.options())
+            .singleWhere((option) => option.id == 'cook-tomato-eggs')
+            .recognitionId,
+        isNotNull,
+      );
       expect(
         (await reopened.options())
             .singleWhere((option) => option.id == 'cook-tomato-eggs')

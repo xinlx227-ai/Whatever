@@ -1,0 +1,111 @@
+{
+  "date": "2026-10-11",
+  "timezone": "Asia/Shanghai",
+  "baseCommit": "bca3fa23a8f45c35100961e75e2f0e152bf26e80",
+  "branch": "codex/issue-12-local-recognition",
+  "workingTree": "uncommitted",
+  "datasetVersion": "2026-10-11.1",
+  "checks": {
+    "analyze": "passed",
+    "testsPassed": 285,
+    "comparisonCases": 287,
+    "confirmedPrecision": "189/189",
+    "semanticCoverage": "242/287",
+    "falseHardBlocks": "0/98",
+    "diffCheck": "passed",
+    "apk": "incomplete: interrupted stalled HTTPS dependency download",
+    "nativeJourneys": "not run"
+  },
+  "sourceFiles": [
+    {
+      "path": "docs/data/local-recognition.md",
+      "sha256": "01db209933749b0fe2682cf4a9948309c30e6ebfaedaa2a4c23f56cbb4b6a49f"
+    },
+    {
+      "path": "docs/verification/s11-local-recognition.md",
+      "sha256": "aa96199db6c374fd61a93f62c9666564416d198717e54b999901f98186a27b8f"
+    },
+    {
+      "path": "lib/application/meal_controller.dart",
+      "sha256": "c799ac1f2d2164c7261e04aa050d5491952d66efa6e723183dec04a7064b1c58"
+    },
+    {
+      "path": "lib/data/meal_repository.dart",
+      "sha256": "ffe135e3e1808db5b8f635f1f433911f7d633ee0400d387a6fe2bec44ed888ea"
+    },
+    {
+      "path": "lib/domain/local_recognition.dart",
+      "sha256": "5623467bd626a1e3ae806a47e74b24fa0026c74eaa3fef495f1f71050d4c4fe0"
+    },
+    {
+      "path": "lib/domain/meal.dart",
+      "sha256": "0b3e46ed2354da854bd232c29994d5256b49b8c3e5865c99df1def0d0d80a305"
+    },
+    {
+      "path": "lib/presentation/option_editor.dart",
+      "sha256": "14a0e79a96e54673566ec5d54c96dc571174880142b06307a2787a498d53789c"
+    },
+    {
+      "path": "test/batch_repository_test.dart",
+      "sha256": "cfdadb24c87583237dc1eb0ffb40a0d92e7647e2529f0e176c9f46aaba6e6ae0"
+    },
+    {
+      "path": "test/category_repository_test.dart",
+      "sha256": "60581054dcf7e6c726ca9bd3b64aee4ccb193d14dbefc2e0036033251c2617ec"
+    },
+    {
+      "path": "test/fixtures/local_recognition_cases.json",
+      "sha256": "e972555e6725d4a5a566791ca5140b37da83957d5b457fcc53704917d9c9e40b"
+    },
+    {
+      "path": "test/library_actions_test.dart",
+      "sha256": "a425248d6588990cbda68e452ffa587518e0d1aebe73ea9fd83c70a27c7dbfe5"
+    },
+    {
+      "path": "test/local_recognition_test.dart",
+      "sha256": "b932fa4b801d24d17fb4963aea353cd9fa814fe29848128e5da3242433df3dd6"
+    },
+    {
+      "path": "test/option_editor_test.dart",
+      "sha256": "28b22f06420372585c772a2e3c384f8ed834f6069ceaa35ef4483ca52186cb66"
+    },
+    {
+      "path": "test/preferences_test.dart",
+      "sha256": "4e4654b6754806f6e2de78aeda5cc526eadfd2b9f753254e88f73a0483ef6b1e"
+    },
+    {
+      "path": "test/recognition_repository_test.dart",
+      "sha256": "3ade83dee628b08474528b145d01436f6fc67076d66a1a00ef9de7666e6a4a04"
+    },
+    {
+      "path": "test/scenario_repository_test.dart",
+      "sha256": "8d361d60530baa00469def068713a4f188891e983629a32761883465282bb2f5"
+    },
+    {
+      "path": "test/scenario_ui_test.dart",
+      "sha256": "3616fd985580eb0c16c95b03506d3cd74c1b8ebe24c8aab49962c809cad856af"
+    }
+  ],
+  "localLogs": [
+    {
+      "path": "build/issue-12-analyze.log",
+      "sha256": "ecac8ae1f166fb102387a951396e8653232d70ce0c092d6b594915c863004f73"
+    },
+    {
+      "path": "build/issue-12-tests-final.log",
+      "sha256": "08f835d085a904d0b272878a26d19693edbc2025655f2a6b00ca6404a954d331"
+    },
+    {
+      "path": "build/issue-12-evaluation.log",
+      "sha256": "60962dbb44ef4582beff38bd8f72d6cf155c6572fc96ca9fd5e687d769e52dcd"
+    },
+    {
+      "path": "build/issue-12-apk.log",
+      "sha256": "8f76073151c0dc0fc6b316f44aa948cc327ee7d5b3c4cd0794290dcf8e914004"
+    },
+    {
+      "path": "build/issue-12-gradle-threads.log",
+      "sha256": "bcc49f79ef6f07efb68779f2f075378694ab71dc8382e19d12dc598a7f6281d7"
+    }
+  ]
+}

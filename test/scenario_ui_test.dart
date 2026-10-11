@@ -304,8 +304,10 @@ void main() {
         findsOneWidget,
       );
       await tester.enterText(find.byKey(const Key('option-name')), '街角小馆');
+      await tester.enterText(find.byKey(const Key('option-address')), '东街 2 号');
       await save(tester);
-      expect(find.text('已有同名餐厅'), findsOneWidget);
+      expect(find.text('已有相同餐厅'), findsOneWidget);
+      expect(find.textContaining('请在名称中注明'), findsOneWidget);
       // The save flow awaits dialogs in the real async zone used for SQLite.
       await tester.runAsync(() async {
         await tester.tap(find.text('查看已有选项'));

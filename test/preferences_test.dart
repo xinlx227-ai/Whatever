@@ -256,7 +256,7 @@ void main() {
       expect(history.option.periods, legacyOption.periods);
       final database = await inspect();
       try {
-        expect(await database.getVersion(), 7);
+        expect(await database.getVersion(), 8);
         expect(await database.query('history_records'), hasLength(1));
         expect(await database.query('history_items'), hasLength(1));
         expect(await database.rawQuery('PRAGMA foreign_key_check'), isEmpty);
@@ -292,6 +292,7 @@ void main() {
         await legacy.execute(
           'ALTER TABLE preferences DROP COLUMN card_tutorial_dismissed',
         );
+        await legacy.execute('ALTER TABLE options DROP COLUMN recognition_id');
         await legacy.setVersion(5);
         await legacy.update(
           'options',
@@ -355,6 +356,9 @@ void main() {
         final before = <String, List<Map<String, Object?>>>{};
         final legacy = await inspect();
         try {
+          await legacy.execute(
+            'ALTER TABLE options DROP COLUMN recognition_id',
+          );
           for (final table in [
             'options',
             'option_periods',
@@ -381,10 +385,14 @@ void main() {
         );
         final database = await inspect();
         try {
-          expect(await database.getVersion(), 7);
+          expect(await database.getVersion(), 8);
           for (final entry in before.entries) {
             expect(
-              await database.query(entry.key, orderBy: 'rowid'),
+              await database.query(
+                entry.key,
+                columns: entry.value.firstOrNull?.keys.toList(),
+                orderBy: 'rowid',
+              ),
               entry.value,
             );
           }

@@ -55,7 +55,7 @@ void main() {
           items,
         );
         expect(await db.rawQuery('PRAGMA foreign_key_check'), isEmpty);
-        expect(await db.getVersion(), 7);
+        expect(await db.getVersion(), 8);
       });
 
   ConfirmationOperation operation(

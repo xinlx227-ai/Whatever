@@ -86,7 +86,8 @@ void main() {
     final deadline = DateTime.now().add(const Duration(seconds: 10));
     while (find.byType(OptionEditor).evaluate().isNotEmpty &&
         tester.widget<FilledButton>(save).onPressed == null &&
-        find.byType(AlertDialog).evaluate().isEmpty) {
+        find.byType(AlertDialog).evaluate().isEmpty &&
+        find.byType(SimpleDialog).evaluate().isEmpty) {
       if (DateTime.now().isAfter(deadline)) {
         throw TimeoutException('Editor save did not finish');
       }
@@ -157,7 +158,7 @@ void main() {
     final option = controller.options.singleWhere((food) => !food.isBuiltIn);
     expect(option.name, '番茄鸡蛋面');
     expect(option.periods, {MealPeriod.lunch});
-    expect(option.category, '未分类');
+    expect(option.category, '面食');
     expect(option.imagePath, isNull);
     expect(controller.period, MealPeriod.dinner);
   });
@@ -179,6 +180,171 @@ void main() {
     expect(controller.result, same(selected));
     final stored = await tester.runAsync(repository.options);
     expect(stored, hasLength(seedOptions.length));
+  });
+
+  testWidgets('classification follows input until a manual choice is made', (
+    tester,
+  ) async {
+    await mountEditor(tester);
+    final dropdown = find.byKey(const Key('option-category'));
+    await tester.enterText(name, '番茄鸡蛋面');
+    await tester.pumpAndSettle();
+    expect(find.text('已根据名称分类，可手动修改'), findsOneWidget);
+    expect(
+      tester.widget<DropdownButtonFormField<String>>(dropdown).initialValue,
+      controller
+          .categoriesFor(MealScenario.eat)
+          .singleWhere((value) => value.name == '面食')
+          .id,
+    );
+    await tester.ensureVisible(dropdown);
+    await tester.tap(dropdown);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('轻食').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(name, '南瓜粥');
+    await tester.pumpAndSettle();
+    expect(find.text('已保留你的分类选择'), findsOneWidget);
+    expect(
+      tester.widget<DropdownButtonFormField<String>>(dropdown).initialValue,
+      controller
+          .categoriesFor(MealScenario.eat)
+          .singleWhere((value) => value.name == '轻食')
+          .id,
+    );
+  });
+
+  testWidgets('uncertain duplicates allow inspection and explicit creation', (
+    tester,
+  ) async {
+    final selected = startRound();
+    await mountEditor(tester);
+    await tester.enterText(name, '牛肉面特色版');
+    await tapSave(tester);
+    expect(find.text('可能已有相似选项'), findsOneWidget);
+    expect(controller.result, same(selected));
+    await answerSaveDialog(tester, '查看已有选项');
+    expect(find.text('返回表单'), findsOneWidget);
+    await answerSaveDialog(tester, '返回表单');
+    expect(find.text('仍然添加'), findsOneWidget);
+    await answerSaveDialog(tester, '仍然添加');
+    expect(find.byType(OptionEditor), findsNothing);
+    expect(controller.options.any((value) => value.name == '牛肉面特色版'), isTrue);
+    expect(controller.hasRound, isFalse);
+    expect(controller.takeRestartNotice(), isNotNull);
+  });
+
+  testWidgets('confirmed added ingredients block creation with no override', (
+    tester,
+  ) async {
+    final selected = startRound();
+    await mountEditor(tester);
+    await tester.enterText(name, '牛肉面加蛋');
+    await tapSave(tester);
+    expect(find.text('已有相同餐食'), findsOneWidget);
+    expect(find.text('仍然添加'), findsNothing);
+    expect(controller.result, same(selected));
+    await answerSaveDialog(tester, '取消');
+    expect(controller.options.where((value) => !value.isBuiltIn), isEmpty);
+  });
+
+  testWidgets(
+    'multiple deleted aliases require selecting a restoration target',
+    (tester) async {
+      await tester.runAsync(() async {
+        final database = await databaseFactoryFfi.openDatabase(
+          path.join(directory.path, 'meal.sqlite'),
+          options: OpenDatabaseOptions(singleInstance: false),
+        );
+        try {
+          for (final (id, label) in [
+            ('old-tomato-1', '番茄鸡蛋面'),
+            ('old-tomato-2', '西红柿鸡蛋面'),
+          ]) {
+            await database.insert('options', {
+              'id': id,
+              'name': label,
+              'art': 'noodle',
+              'scenario': 'eat',
+              'category': '未分类',
+              'is_builtin': 0,
+              'is_active': 0,
+              'is_deleted': 1,
+            });
+            await database.insert('option_periods', {
+              'option_id': id,
+              'period': 'dinner',
+            });
+            await database.insert('option_categories', {
+              'option_id': id,
+              'category': '未分类',
+            });
+          }
+        } finally {
+          await database.close();
+        }
+        await controller.initialize();
+      });
+      final selected = startRound();
+      await mountEditor(tester);
+      await tester.enterText(name, '番茄鸡蛋面少油');
+      await tapSave(tester);
+      expect(find.text('选择要恢复的原选项'), findsOneWidget);
+      expect(find.text('恢复并保存'), findsNothing);
+      expect(controller.result, same(selected));
+      await answerSaveDialog(tester, '取消');
+      expect(controller.result, same(selected));
+      await tapSave(tester);
+      await tester.runAsync(() async {
+        await tester.tap(find.textContaining('2. 西红柿鸡蛋面'));
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      });
+      await tester.pumpAndSettle();
+      expect(find.textContaining('本次表单的名称、分类和餐段会覆盖'), findsOneWidget);
+      await answerSaveDialog(tester, '恢复并保存');
+      expect(
+        controller.options
+            .singleWhere((value) => value.id == 'old-tomato-1')
+            .isDeleted,
+        isTrue,
+      );
+      final restored = controller.options.singleWhere(
+        (value) => value.id == 'old-tomato-2',
+      );
+      expect(restored.isDeleted, isFalse);
+      expect(restored.name, '番茄鸡蛋面少油');
+      expect(restored.periods, {MealPeriod.lunch});
+      expect(controller.hasRound, isFalse);
+    },
+  );
+
+  testWidgets('curated alias rename saves directly and remains searchable', (
+    tester,
+  ) async {
+    final original = await create(tester, '番茄鸡蛋面');
+    await mountEditor(tester, option: original);
+    await tester.enterText(name, '西红柿鸡蛋面');
+    await tapSave(tester);
+    expect(find.byType(OptionEditor), findsNothing);
+    expect(controller.libraryOptions(query: '番茄鸡蛋面').single.id, original.id);
+    expect(
+      controller
+          .libraryOptions(scenario: 'cook', query: '番茄鸡蛋面')
+          .every((value) => value.scenario == 'cook'),
+      isTrue,
+    );
+    final updated = controller.options.singleWhere(
+      (value) => value.id == original.id,
+    );
+    await tester.tap(find.text('Open editor'));
+    await tester.pumpAndSettle();
+    await tester.enterText(name, '鸡肉面');
+    await tapSave(tester);
+    expect(find.textContaining('不同的餐食'), findsOneWidget);
+    expect(
+      controller.options.singleWhere((value) => value.id == original.id).name,
+      updated.name,
+    );
   });
 
   testWidgets('Back cancel and discard leave an unfinished round untouched', (
@@ -277,7 +443,7 @@ void main() {
       await tester.tap(find.byKey(const Key('pick-option-image')));
       await tester.pumpAndSettle();
       await tapSave(tester);
-      expect(find.textContaining('已有同名餐食'), findsOneWidget);
+      expect(find.text('已有相同餐食'), findsOneWidget);
       expect(find.text('重新启用'), findsNothing);
       await answerSaveDialog(tester, '取消');
       final ownedDirectory = Directory(
@@ -325,7 +491,7 @@ void main() {
       await tester.enterText(name, '  ＭＹ   ＮＯＯＤＬＥＳ  ');
       await tapSave(tester);
       expect(find.byType(OptionEditor), findsOneWidget);
-      expect(find.textContaining('已有同名餐食'), findsOneWidget);
+      expect(find.text('已有相同餐食'), findsOneWidget);
       expect(controller.options.where((food) => !food.isBuiltIn), hasLength(1));
       expect(controller.result, same(selected));
       expect(controller.restartNotice, isNull);
@@ -468,7 +634,7 @@ void main() {
       final original = await create(tester, '番茄鸡蛋面');
       final selected = startRound();
       await mountEditor(tester, option: original);
-      await tester.enterText(name, '西红柿鸡蛋面');
+      await tester.enterText(name, '妈妈的拿手面');
       await tapSave(tester);
       expect(find.text('还是同一种餐食吗？'), findsOneWidget);
       await answerSaveDialog(tester, '取消');
@@ -482,7 +648,7 @@ void main() {
       expect(find.byType(OptionEditor), findsNothing);
       expect(
         controller.options.singleWhere((food) => food.id == original.id).name,
-        '西红柿鸡蛋面',
+        '妈妈的拿手面',
       );
       expect(controller.hasRound, isFalse);
     },

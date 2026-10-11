@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../application/meal_controller.dart';
 import '../data/option_images.dart';
 import '../domain/meal.dart';
+import '../domain/local_recognition.dart';
 import 'option_art.dart';
 
 class OptionEditor extends StatefulWidget {
@@ -46,6 +47,7 @@ class _OptionEditorState extends State<OptionEditor> {
   bool busy = false;
   bool leaving = false;
   bool asking = false;
+  bool manualCategory = false;
   FoodOption? get original => widget.option;
   MealScenario get scenario => original == null
       ? widget.scenario
@@ -95,8 +97,9 @@ class _OptionEditorState extends State<OptionEditor> {
         )
         .id;
     initialCategoryId = categoryId;
+    manualCategory = original != null;
     selectedImage = widget.initialImagePath;
-    name.addListener(refresh);
+    name.addListener(nameChanged);
     address.addListener(refresh);
     notes.addListener(refresh);
     widget.controller.addListener(refresh);
@@ -104,6 +107,17 @@ class _OptionEditorState extends State<OptionEditor> {
 
   void refresh() {
     if (mounted) setState(() {});
+  }
+
+  void nameChanged() {
+    if (!manualCategory) {
+      categoryId = const LocalRecognition().inferCategoryId(
+        name.text,
+        scenario,
+        categories,
+      );
+    }
+    refresh();
   }
 
   @override
@@ -115,7 +129,7 @@ class _OptionEditorState extends State<OptionEditor> {
         widget.controller.imagePathsInUse,
       ),
     );
-    name.removeListener(refresh);
+    name.removeListener(nameChanged);
     name.dispose();
     address.removeListener(refresh);
     address.dispose();
@@ -129,6 +143,7 @@ class _OptionEditorState extends State<OptionEditor> {
         context: context,
         builder: (context) => AlertDialog(
           title: Text(title),
+          scrollable: true,
           content: Text(message),
           actions: [
             TextButton(
@@ -183,14 +198,131 @@ class _OptionEditorState extends State<OptionEditor> {
     }
   }
 
-  Future<bool> resolveDuplicate(FoodOption option) async {
+  Future<void> viewOption(FoodOption option) async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(option.name),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              OptionArt(option: option, size: 100),
+              const SizedBox(height: 12),
+              Text(
+                '${option.categories.join(' / ')} · ${option.isDeleted
+                    ? '已删除'
+                    : option.isActive
+                    ? '已启用'
+                    : '已停用'}',
+              ),
+              Text(
+                MealPeriod.values
+                    .where(option.periods.contains)
+                    .map((period) => period.label)
+                    .join(' · '),
+              ),
+              if (option.address != null) Text(option.address!),
+              if (option.notes != null) Text(option.notes!),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('返回表单'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<FoodOption?> chooseMatch(
+    List<FoodOption> matches, {
+    required String title,
+  }) async {
+    if (matches.length == 1) return matches.single;
+    return showDialog<FoodOption>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text(title),
+        children: [
+          for (final (index, option) in matches.indexed)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, option),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  '${index + 1}. ${option.name}\n'
+                  '${option.category} · ${option.isDeleted
+                      ? '已删除'
+                      : option.isActive
+                      ? '已启用'
+                      : '已停用'}'
+                  '${option.address == null ? '' : '\n${option.address}'}',
+                ),
+              ),
+            ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> resolveUncertain(List<FoodOption> matches) async {
+    while (mounted) {
+      if (!mounted) return false;
+      final action = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('可能已有相似选项'),
+          content: Text(
+            '“${matches.map((option) => option.name).join('”、“')}”与输入名称相似，'
+            '但无法确定是否相同。请查看已有资料，或确认仍然${original == null ? '添加' : '保存'}。',
+          ),
+          scrollable: true,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'view'),
+              child: const Text('查看已有选项'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'proceed'),
+              child: Text(original == null ? '仍然添加' : '仍然保存'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || action == null) return false;
+      if (action == 'proceed') return true;
+      final selected = await chooseMatch(matches, title: '选择要查看的选项');
+      if (!mounted) return false;
+      if (selected != null) await viewOption(selected);
+    }
+    return false;
+  }
+
+  Future<bool> resolveDuplicate(FoodOption option, String? message) async {
     final action = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(isRestaurant ? '已有同名餐厅' : '已有同名餐食'),
+        title: Text(isRestaurant ? '已有相同餐厅' : '已有相同餐食'),
+        scrollable: true,
         content: Text(
-          '“${option.name}”${option.isActive ? '已在选项库中' : '目前已停用'}，不会创建重复选项。'
-          '${!option.isActive && !option.isDeleted ? '重新启用会保留原有资料，本次表单内容不会保存。' : ''}',
+          '“${option.name}”${option.isDeleted
+              ? '曾被删除'
+              : option.isActive
+              ? '已在选项库中'
+              : '目前已停用'}，不会创建重复选项。'
+          '${!option.isActive && !option.isDeleted ? '重新启用会保留原有资料，本次表单内容不会保存。' : ''}'
+          '${message == null ? '' : '\n$message'}',
         ),
         actions: [
           TextButton(
@@ -211,42 +343,7 @@ class _OptionEditorState extends State<OptionEditor> {
     );
     if (!mounted) return false;
     if (action == 'view') {
-      await showDialog<void>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text(option.name),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                OptionArt(option: option, size: 100),
-                const SizedBox(height: 12),
-                Text(
-                  '${option.categories.join(' / ')} · ${option.isDeleted
-                      ? '已删除'
-                      : option.isActive
-                      ? '已启用'
-                      : '已停用'}',
-                ),
-                Text(
-                  MealPeriod.values
-                      .where(option.periods.contains)
-                      .map((period) => period.label)
-                      .join(' · '),
-                ),
-                if (option.address != null) Text(option.address!),
-                if (option.notes != null) Text(option.notes!),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('返回表单'),
-            ),
-          ],
-        ),
-      );
+      await viewOption(option);
     } else if (action == 'reactivate') {
       final result = await widget.controller.setOptionActive(option.id, true);
       if (!mounted) return false;
@@ -277,6 +374,8 @@ class _OptionEditorState extends State<OptionEditor> {
       }
       var restore = false;
       var sameFood = false;
+      var allowUncertain = false;
+      String? restoreOptionId;
       while (mounted) {
         final result = await widget.controller.saveOption(
           id: original?.id,
@@ -289,6 +388,8 @@ class _OptionEditorState extends State<OptionEditor> {
           imagePath: ownedImage ?? original?.imagePath,
           confirmRestore: restore,
           confirmSameFood: sameFood,
+          allowUncertainDuplicate: allowUncertain,
+          restoreOptionId: restoreOptionId,
         );
         if (!mounted) return;
         if (result.succeeded) {
@@ -307,15 +408,25 @@ class _OptionEditorState extends State<OptionEditor> {
           return;
         }
         if (result.status == OptionMutationStatus.restorationRequired) {
+          final target = await chooseMatch(result.matches, title: '选择要恢复的原选项');
+          if (!mounted || target == null) break;
           if (await ask(
             '恢复原来的选项？',
-            '“${result.option!.name}”曾被删除。恢复会沿用原来的身份，与已有足迹保持关联。',
+            '“${target.name}”曾被删除。恢复会沿用原来的身份，与已有足迹保持关联。'
+                '本次表单的名称、分类和餐段会覆盖原有设置；未选择新图片时保留原图。'
+                '${isRestaurant ? '地址和备注也会按表单保存，留空会清除原内容。${result.message ?? ''}' : ''}',
             '恢复并保存',
           )) {
             restore = true;
-            if (result.option!.imagePath != null) {
-              imageCleanupCandidates.add(result.option!.imagePath!);
+            restoreOptionId = target.id;
+            if (target.imagePath != null) {
+              imageCleanupCandidates.add(target.imagePath!);
             }
+            continue;
+          }
+        } else if (result.status == OptionMutationStatus.uncertainDuplicate) {
+          if (await resolveUncertain(result.matches)) {
+            allowUncertain = true;
             continue;
           }
         } else if (result.status ==
@@ -331,7 +442,12 @@ class _OptionEditorState extends State<OptionEditor> {
             continue;
           }
         } else if (result.status == OptionMutationStatus.duplicate) {
-          if (await resolveDuplicate(result.option!) && mounted) {
+          final target = await chooseMatch(
+            result.matches,
+            title: '已有多个相同选项，请选择查看',
+          );
+          if (!mounted || target == null) break;
+          if (await resolveDuplicate(target, result.message) && mounted) {
             setState(() => leaving = true);
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) Navigator.pop(context, true);
@@ -470,25 +586,38 @@ class _OptionEditorState extends State<OptionEditor> {
                       ),
                       const Text('未选图片时使用系统插画。'),
                       const SizedBox(height: 24),
-                      DropdownButtonFormField<String>(
-                        key: const Key('option-category'),
-                        initialValue: selectedCategory.id,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: '分类',
-                          border: OutlineInputBorder(),
+                      KeyedSubtree(
+                        key: ValueKey(selectedCategory.id),
+                        child: DropdownButtonFormField<String>(
+                          key: const Key('option-category'),
+                          initialValue: selectedCategory.id,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            labelText: '分类',
+                            helperText: locked
+                                ? null
+                                : manualCategory
+                                ? '已保留你的分类选择'
+                                : selectedCategory.isFallback
+                                ? '暂无法确定分类，可手动选择'
+                                : '已根据名称分类，可手动修改',
+                            border: const OutlineInputBorder(),
+                          ),
+                          items: categories
+                              .map(
+                                (value) => DropdownMenuItem(
+                                  value: value.id,
+                                  child: Text(value.name),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: busy || locked
+                              ? null
+                              : (value) => setState(() {
+                                  manualCategory = true;
+                                  categoryId = value!;
+                                }),
                         ),
-                        items: categories
-                            .map(
-                              (value) => DropdownMenuItem(
-                                value: value.id,
-                                child: Text(value.name),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: busy || locked
-                            ? null
-                            : (value) => setState(() => categoryId = value!),
                       ),
                       if (locked && currentOption!.categories.length > 1)
                         Padding(
