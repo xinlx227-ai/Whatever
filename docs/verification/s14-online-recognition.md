@@ -2,11 +2,11 @@
 
 ## Agreement and tracker reconciliation
 
-Implementation baseline: main `66a5ae4b59b721a34c593d01964f99ecb58bbeee`; local branch `codex/issue-15-online-recognition`. Scope follows the final user-confirmed 2026-10-12 implementation handoff and [Issue #15](https://github.com/xinlx227-ai/Whatever/issues/15), with blockers #6/#12 verified closed. This document records local implementation, not tracker publication or release authorization.
+Implementation baseline: main `66a5ae4b59b721a34c593d01964f99ecb58bbeee`; implementation commit `bf419e7`, merged into local main. Scope follows the final user-confirmed 2026-10-12 implementation handoff and [Issue #15](https://github.com/xinlx227-ai/Whatever/issues/15), with blockers #6/#12 verified closed. On 2026-10-12 the user authorized pushing main, reconciling and closing Issue #15, and deleting the merged feature branch. They explicitly accepted skipping another emulator smoke test. This is source delivery, not APK publication or store release.
 
 The handoff supersedes the issue's older gateway/off-device credential and anonymous spending-control language. The accepted architecture calls Xiaomi `mimo-v2.6-flash` directly, bundles a shared build-injected key, and has no account, invitation service, gateway, monthly monetary cap, or remote key distribution. The key is extractable from delivered packages. Local per-install quotas are not account-wide or tamper-proof. Key rotation requires a new package; old invalid keys fall back locally.
 
-Earlier evaluation artifacts are preserved under [the research entry point](../research/s14-online-recognition-feasibility.md). The original 520-call allowance is exhausted. Initial implementation verification used fakes and controlled local HTTP only. The user subsequently explicitly authorized paid calls as part of emulator testing; the live follow-up below records that separate scope without changing historical evaluation journals.
+Earlier evaluation artifacts are preserved locally under `docs/research/s14-online-recognition-feasibility.md` and `docs/research/mimo-evaluation/`; these pre-existing untracked research files are outside this source delivery. The original 520-call allowance is exhausted. Initial implementation verification used fakes and controlled local HTTP only. The user subsequently explicitly authorized paid calls as part of emulator testing; the live follow-up below records that separate scope without changing historical evaluation journals.
 
 ## Implementation
 
@@ -84,3 +84,9 @@ Repair release build: scripts/build-online-apk.ps1 succeeded. Artifact: build/ap
 The optional Standards suggestion is resolved: `resolveAdvisory` returns the private `_AdvisoryOutcome` enum (`proceed`, `restore`, `used`), with `null` still representing cancellation. Both save call sites consume enum values. Dialog choices and user-facing behavior are unchanged.
 
 Static analysis, all 44 tests in `option_editor_test.dart` and `online_recognition_ui_test.dart`, and whitespace checks passed. Logs: `build/s14-enum-analyze.log` and `build/s14-enum-tests.log`. The source manifest records the new editor fingerprint and this bounded follow-up validation. The 433-test full-suite run and release APK above predate this type-only cleanup; neither was rerun/rebuilt. No new emulator journey or paid call was made.
+
+### Main validation and delivery decision (2026-10-12)
+
+After the enum cleanup was committed and fast-forward merged as `bf419e7`, `flutter analyze --no-pub` passed and the complete `flutter test --no-pub --reporter expanded` suite passed all 433 tests on main. The committed comparison against `66a5ae4` passed whitespace validation. Logs: `build/s14-main-analyze.log` and `build/s14-main-tests.log`. These results supersede the earlier note that the full suite had not been rerun after enum cleanup.
+
+The user accepted the remaining native-validation gap and authorized source push, Issue #15 closure, and deletion of `codex/issue-15-online-recognition`. The existing APK predates the final enum cleanup; the branch-identity fixes and enum cleanup have automated coverage but no new emulator smoke journey. No physical-device, accessibility, production accuracy, or mobile reliability claim is added. Research files and unrelated prototypes remain preserved locally.
