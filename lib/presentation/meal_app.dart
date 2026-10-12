@@ -53,6 +53,7 @@ class MealApp extends StatelessWidget {
                 : const Color(0xffd6c6b3),
           );
       return MaterialApp(
+        navigatorObservers: [optionEditorRouteObserver],
         title: '这一餐',
         debugShowCheckedModeBanner: false,
         locale: const Locale('zh', 'CN'),

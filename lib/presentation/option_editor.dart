@@ -1,14 +1,23 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../application/meal_controller.dart';
+import '../application/online_recognition_session.dart';
 import '../data/option_images.dart';
 import '../domain/meal.dart';
 import '../domain/local_recognition.dart';
+import '../domain/online_recognition.dart';
+import 'online_recognition_settings.dart';
 import 'option_art.dart';
+
+// Observe full pages only: a category menu is a PopupRoute, not a navigation away.
+final optionEditorRouteObserver = RouteObserver<PageRoute<dynamic>>();
+
+enum _AdvisoryOutcome { proceed, restore, used }
 
 class OptionEditor extends StatefulWidget {
   const OptionEditor({
@@ -31,7 +40,7 @@ class OptionEditor extends StatefulWidget {
   State<OptionEditor> createState() => _OptionEditorState();
 }
 
-class _OptionEditorState extends State<OptionEditor> {
+class _OptionEditorState extends State<OptionEditor> with RouteAware {
   final form = GlobalKey<FormState>();
   late final TextEditingController name;
   late final TextEditingController address;
@@ -48,6 +57,16 @@ class _OptionEditorState extends State<OptionEditor> {
   bool leaving = false;
   bool asking = false;
   bool manualCategory = false;
+  bool aiCategory = false;
+  Timer? recognitionDebounce;
+  late final OnlineRecognitionSession onlineSession;
+  OnlineRecognitionResult? onlineResult;
+  String? onlineSnapshot;
+  String? observedSnapshot;
+  String? lastScheduledName;
+  bool consentOpen = false;
+  int formRevision = 0;
+  PageRoute<dynamic>? observedRoute;
   FoodOption? get original => widget.option;
   MealScenario get scenario => original == null
       ? widget.scenario
@@ -98,11 +117,198 @@ class _OptionEditorState extends State<OptionEditor> {
         .id;
     initialCategoryId = categoryId;
     manualCategory = original != null;
+    onlineSession = OnlineRecognitionSession(
+      transport: widget.controller.onlineTransportFactory(),
+      apiKey: widget.controller.onlineApiKey,
+      reserve: widget.controller.reserveOnlineRequest,
+      enabled: () =>
+          widget.controller.onlineSettings.enabled &&
+          widget.controller.onlineSettings.consentGranted,
+    );
+    observedSnapshot = recognitionSnapshot;
     selectedImage = widget.initialImagePath;
     name.addListener(nameChanged);
     address.addListener(refresh);
     notes.addListener(refresh);
-    widget.controller.addListener(refresh);
+    widget.controller.addListener(controllerChanged);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute<dynamic> && route != observedRoute) {
+      optionEditorRouteObserver.unsubscribe(this);
+      observedRoute = route;
+      optionEditorRouteObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void didPushNext() => invalidateRecognition();
+
+  // This local-only fingerprint includes state needed for safe reuse, never payload data.
+  String get recognitionSnapshot => jsonEncode([
+    name.text,
+    scenario.name,
+    original?.id,
+    for (final c in categories) [c.id, c.name, c.isFallback],
+    for (final o in widget.controller.options.where(
+      (o) => o.scenario == scenario.name,
+    ))
+      [o.id, o.name, o.isActive, o.isDeleted, o.recognitionId],
+  ]);
+
+  void invalidateRecognition({bool clearResult = true}) {
+    formRevision++;
+    recognitionDebounce?.cancel();
+    onlineSession.invalidate();
+    if (clearResult) {
+      onlineResult = null;
+      onlineSnapshot = null;
+    }
+  }
+
+  void controllerChanged() {
+    if (!mounted) return;
+    final snapshot = recognitionSnapshot;
+    if (observedSnapshot != snapshot ||
+        !widget.controller.onlineSettings.enabled) {
+      invalidateRecognition();
+      observedSnapshot = snapshot;
+      if (aiCategory && !manualCategory) {
+        aiCategory = false;
+        categoryId = const LocalRecognition().inferCategoryId(
+          name.text,
+          scenario,
+          categories,
+        );
+      }
+    }
+    refresh();
+  }
+
+  bool get needsOnline {
+    if (name.text.trim().isEmpty ||
+        (original != null &&
+            normalizedOptionName(name.text) ==
+                normalizedOptionName(original!.name))) {
+      return false;
+    }
+    const local = LocalRecognition();
+    final localCategory = local.inferCategoryId(
+      name.text,
+      scenario,
+      categories,
+    );
+    final matches = widget.controller.options.where(
+      (o) => o.scenario == scenario.name && o.id != original?.id,
+    );
+    final judgments = matches
+        .map(
+          (o) => local.compare(
+            name.text,
+            o.name,
+            scenario.name,
+            identityA: original?.recognitionId,
+            identityB: o.recognitionId,
+          ),
+        )
+        .toList();
+    if (judgments.contains(NameMatch.confirmed)) return false;
+    return (!manualCategory &&
+            localCategory == widget.controller.fallbackCategory(scenario).id) ||
+        judgments.any(
+          (m) => m == NameMatch.unknown || m == NameMatch.uncertain,
+        );
+  }
+
+  Future<void> recognizeAfterPause(int revision) async {
+    if (!mounted ||
+        busy ||
+        asking ||
+        consentOpen ||
+        leaving ||
+        revision != formRevision ||
+        !needsOnline) {
+      return;
+    }
+    if (ModalRoute.of(context)?.isCurrent != true) {
+      recognitionDebounce = Timer(
+        const Duration(milliseconds: 100),
+        () => recognizeAfterPause(revision),
+      );
+      return;
+    }
+    final controller = widget.controller;
+    if (!controller.onlineSettings.consentAsked && !consentOpen) {
+      consentOpen = true;
+      await requestOnlineConsent(context, controller);
+      consentOpen = false;
+      if (!mounted || busy || leaving || revision != formRevision) return;
+    }
+    if (!controller.onlineSettings.enabled) return;
+    final snapshot = recognitionSnapshot;
+    final request = OnlineRecognitionRequest.build(
+      name: name.text,
+      scenario: scenario,
+      categories: categories,
+      candidates: controller.options,
+      excludeOptionId: original?.id,
+    );
+    if (request == null) return;
+    final result = await onlineSession.recognize(request);
+    if (!mounted ||
+        busy ||
+        leaving ||
+        revision != formRevision ||
+        snapshot != recognitionSnapshot ||
+        !controller.onlineSettings.enabled ||
+        result == null) {
+      return;
+    }
+    applyOnlineResult(result, snapshot, revision);
+  }
+
+  void applyOnlineResult(
+    OnlineRecognitionResult result,
+    String snapshot,
+    int revision,
+  ) {
+    if (!mounted ||
+        busy ||
+        leaving ||
+        revision != formRevision ||
+        snapshot != recognitionSnapshot ||
+        !widget.controller.onlineSettings.enabled) {
+      return;
+    }
+    onlineResult = result;
+    onlineSnapshot = snapshot;
+    // Preserve a timely reply while the user browses the category menu, and
+    // apply only after it closes so rebuilding cannot dismiss their selection.
+    if (ModalRoute.of(context)?.isCurrent != true) {
+      recognitionDebounce = Timer(
+        const Duration(milliseconds: 100),
+        () => applyOnlineResult(result, snapshot, revision),
+      );
+      return;
+    }
+    final controller = widget.controller;
+    setState(() {
+      if (!manualCategory &&
+          const LocalRecognition().inferCategoryId(
+                name.text,
+                scenario,
+                categories,
+              ) ==
+              controller.fallbackCategory(scenario).id &&
+          result.categoryId != null &&
+          categories.any((c) => c.id == result.categoryId && !c.isFallback)) {
+        categoryId = result.categoryId!;
+        aiCategory = true;
+      }
+    });
   }
 
   void refresh() {
@@ -110,6 +316,10 @@ class _OptionEditorState extends State<OptionEditor> {
   }
 
   void nameChanged() {
+    if (lastScheduledName == name.text) return;
+    lastScheduledName = name.text;
+    invalidateRecognition();
+    aiCategory = false;
     if (!manualCategory) {
       categoryId = const LocalRecognition().inferCategoryId(
         name.text,
@@ -117,12 +327,21 @@ class _OptionEditorState extends State<OptionEditor> {
         categories,
       );
     }
+    observedSnapshot = recognitionSnapshot;
+    final revision = formRevision;
+    recognitionDebounce = Timer(
+      const Duration(milliseconds: 600),
+      () => recognizeAfterPause(revision),
+    );
     refresh();
   }
 
   @override
   void dispose() {
-    widget.controller.removeListener(refresh);
+    optionEditorRouteObserver.unsubscribe(this);
+    widget.controller.removeListener(controllerChanged);
+    recognitionDebounce?.cancel();
+    onlineSession.dispose();
     unawaited(
       images.discardUnreferenced(
         imageCleanupCandidates,
@@ -161,10 +380,12 @@ class _OptionEditorState extends State<OptionEditor> {
 
   Future<void> close() async {
     if (busy || asking) return;
+    invalidateRecognition(clearResult: false);
     asking = true;
     final discard = !dirty || await ask('放弃未保存的修改？', '这次填写的内容还没有保存。', '放弃修改');
     asking = false;
     if (!mounted || !discard) return;
+    invalidateRecognition();
     setState(() => leaving = true);
     // Allow PopScope to publish the new disposition before popping.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -272,41 +493,135 @@ class _OptionEditorState extends State<OptionEditor> {
     );
   }
 
-  Future<bool> resolveUncertain(List<FoodOption> matches) async {
+  List<FoodOption> advisoryMatches(OnlineRecognitionResult? result) {
+    if (original != null &&
+        normalizedOptionName(name.text) ==
+            normalizedOptionName(original!.name)) {
+      return [];
+    }
+    const local = LocalRecognition();
+    final possible = <FoodOption>[];
+    for (final option in widget.controller.options) {
+      if (option.id == original?.id || option.scenario != scenario.name) {
+        continue;
+      }
+      final match = local.compare(
+        name.text,
+        option.name,
+        scenario.name,
+        identityA: original?.recognitionId,
+        identityB: option.recognitionId,
+      );
+      // Confirmed duplicates are resolved by the authoritative repository flow.
+      if (match == NameMatch.confirmed) return [];
+      if (match == NameMatch.uncertain ||
+          (match != NameMatch.different &&
+              (result?.duplicateIds.contains(option.id) ?? false))) {
+        possible.add(option);
+      }
+    }
+    return possible;
+  }
+
+  Future<bool> confirmRestoration(FoodOption target, {String? message}) => ask(
+    '恢复原来的选项？',
+    '“${target.name}”曾被删除。恢复会沿用原来的身份，与已有足迹保持关联。'
+        '本次表单的名称、分类和餐段会覆盖原有设置；未选择新图片时保留原图。'
+        '${isRestaurant ? '地址和备注也会按表单保存，留空会清除原内容。${message ?? ''}' : ''}',
+    '恢复并保存',
+  );
+
+  String? advisoryRestoreId;
+
+  Future<_AdvisoryOutcome?> resolveAdvisory(List<FoodOption> matches) async {
+    final snapshot = recognitionSnapshot;
     while (mounted) {
-      if (!mounted) return false;
       final action = await showDialog<String>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('可能已有相似选项'),
-          content: Text(
-            '“${matches.map((option) => option.name).join('”、“')}”与输入名称相似，'
-            '但无法确定是否相同。请查看已有资料，或确认仍然${original == null ? '添加' : '保存'}。',
-          ),
           scrollable: true,
+          content: Text(
+            matches
+                .map(
+                  (o) =>
+                      '“${o.name}” · ${o.category} · '
+                      '${o.isDeleted
+                          ? '已删除'
+                          : o.isActive
+                          ? '已启用'
+                          : '已停用'}',
+                )
+                .join('\n'),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('取消'),
+              child: const Text('返回编辑'),
             ),
             TextButton(
-              onPressed: () => Navigator.pop(context, 'view'),
-              child: const Text('查看已有选项'),
+              onPressed: () => Navigator.pop(context, 'existing'),
+              child: Text(original == null ? '使用已有' : '查看已有项'),
             ),
             TextButton(
               onPressed: () => Navigator.pop(context, 'proceed'),
-              child: Text(original == null ? '仍然添加' : '仍然保存'),
+              child: Text(original == null ? '保存新项' : '仍然保存本条'),
             ),
           ],
         ),
       );
-      if (!mounted || action == null) return false;
-      if (action == 'proceed') return true;
-      final selected = await chooseMatch(matches, title: '选择要查看的选项');
-      if (!mounted) return false;
-      if (selected != null) await viewOption(selected);
+      if (!mounted || action == null) return null;
+      if (snapshot != recognitionSnapshot) {
+        setState(() => error = '选项库已变化，请重新保存以核对最新资料。');
+        return null;
+      }
+      if (action == 'proceed') return _AdvisoryOutcome.proceed;
+      final target = await chooseMatch(
+        matches,
+        title: original == null ? '选择要使用的选项' : '选择要查看的选项',
+      );
+      if (!mounted || snapshot != recognitionSnapshot) return null;
+      if (target == null) continue;
+      if (original != null) {
+        await viewOption(target);
+        continue;
+      }
+      if (target.isDeleted) {
+        if (!await ask(
+          '使用已删除选项？',
+          '“${target.name}”已删除，需恢复原来的身份后使用。',
+          '恢复并使用',
+        )) {
+          continue;
+        }
+        if (!mounted || snapshot != recognitionSnapshot) return null;
+        if (!await confirmRestoration(target)) continue;
+        if (!mounted || snapshot != recognitionSnapshot) return null;
+        advisoryRestoreId = target.id;
+        if (target.imagePath != null) {
+          imageCleanupCandidates.add(target.imagePath!);
+        }
+        return _AdvisoryOutcome.restore;
+      }
+      if (!target.isActive) {
+        if (!await ask(
+          '启用已有选项？',
+          '将启用“${target.name}”，保留其原有资料。本次表单内容不会保存。',
+          '启用并使用',
+        )) {
+          continue;
+        }
+        if (!mounted || snapshot != recognitionSnapshot) return null;
+        final result = await widget.controller.setOptionActive(target.id, true);
+        if (!mounted) return null;
+        if (!result.succeeded) {
+          setState(() => error = result.message);
+          return null;
+        }
+      }
+      return _AdvisoryOutcome.used;
     }
-    return false;
+    return null;
   }
 
   Future<bool> resolveDuplicate(FoodOption option, String? message) async {
@@ -360,11 +675,32 @@ class _OptionEditorState extends State<OptionEditor> {
       return;
     }
     FocusScope.of(context).unfocus();
+    final timelyResult =
+        onlineSnapshot == recognitionSnapshot &&
+            widget.controller.onlineSettings.enabled
+        ? onlineResult
+        : null;
+    final possibleMatches = advisoryMatches(timelyResult);
+    invalidateRecognition(clearResult: false);
     setState(() {
       busy = true;
       error = null;
     });
     try {
+      advisoryRestoreId = null;
+      var allowUncertain = false;
+      if (possibleMatches.isNotEmpty) {
+        final action = await resolveAdvisory(possibleMatches);
+        if (!mounted || action == null) return;
+        if (action == _AdvisoryOutcome.used) {
+          setState(() => leaving = true);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) Navigator.pop(context, true);
+          });
+          return;
+        }
+        allowUncertain = true;
+      }
       if (selectedImage != null && ownedImage == null) {
         ownedImage = await images.persist(
           selectedImage!,
@@ -372,9 +708,8 @@ class _OptionEditorState extends State<OptionEditor> {
         );
         imageCleanupCandidates.add(ownedImage!);
       }
-      var restore = false;
+      var restore = advisoryRestoreId != null;
       var sameFood = false;
-      var allowUncertain = false;
       String? restoreOptionId;
       while (mounted) {
         final result = await widget.controller.saveOption(
@@ -390,6 +725,7 @@ class _OptionEditorState extends State<OptionEditor> {
           confirmSameFood: sameFood,
           allowUncertainDuplicate: allowUncertain,
           restoreOptionId: restoreOptionId,
+          advisoryRestoreOptionId: advisoryRestoreId,
         );
         if (!mounted) return;
         if (result.succeeded) {
@@ -410,13 +746,7 @@ class _OptionEditorState extends State<OptionEditor> {
         if (result.status == OptionMutationStatus.restorationRequired) {
           final target = await chooseMatch(result.matches, title: '选择要恢复的原选项');
           if (!mounted || target == null) break;
-          if (await ask(
-            '恢复原来的选项？',
-            '“${target.name}”曾被删除。恢复会沿用原来的身份，与已有足迹保持关联。'
-                '本次表单的名称、分类和餐段会覆盖原有设置；未选择新图片时保留原图。'
-                '${isRestaurant ? '地址和备注也会按表单保存，留空会清除原内容。${result.message ?? ''}' : ''}',
-            '恢复并保存',
-          )) {
+          if (await confirmRestoration(target, message: result.message)) {
             restore = true;
             restoreOptionId = target.id;
             if (target.imagePath != null) {
@@ -425,8 +755,19 @@ class _OptionEditorState extends State<OptionEditor> {
             continue;
           }
         } else if (result.status == OptionMutationStatus.uncertainDuplicate) {
-          if (await resolveUncertain(result.matches)) {
+          final action = await resolveAdvisory(result.matches);
+          if (!mounted) return;
+          if (action == _AdvisoryOutcome.used) {
+            setState(() => leaving = true);
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) Navigator.pop(context, true);
+            });
+            return;
+          }
+          if (action == _AdvisoryOutcome.proceed ||
+              action == _AdvisoryOutcome.restore) {
             allowUncertain = true;
+            restore = restore || advisoryRestoreId != null;
             continue;
           }
         } else if (result.status ==
@@ -598,6 +939,8 @@ class _OptionEditorState extends State<OptionEditor> {
                                 ? null
                                 : manualCategory
                                 ? '已保留你的分类选择'
+                                : aiCategory
+                                ? 'AI 自动分类，可手动修改'
                                 : selectedCategory.isFallback
                                 ? '暂无法确定分类，可手动选择'
                                 : '已根据名称分类，可手动修改',
@@ -615,6 +958,7 @@ class _OptionEditorState extends State<OptionEditor> {
                               ? null
                               : (value) => setState(() {
                                   manualCategory = true;
+                                  aiCategory = false;
                                   categoryId = value!;
                                 }),
                         ),

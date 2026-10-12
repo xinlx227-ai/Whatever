@@ -15,6 +15,34 @@ void main() {
   const recognition = LocalRecognition();
   const periods = {MealPeriod.lunch, MealPeriod.dinner};
 
+  test(
+    'unknown same-branch spelling rename retains explicit confirmation',
+    () async {
+      final created = await repository.saveOption(
+        name: '街角小馆（东街店）',
+        scenario: 'restaurant',
+        periods: periods,
+      );
+      expect(created.succeeded, isTrue);
+      final pending = await repository.saveOption(
+        id: created.option!.id,
+        name: '街角小館（东街店）',
+        scenario: 'restaurant',
+        periods: periods,
+      );
+      expect(pending.status, OptionMutationStatus.renameConfirmationRequired);
+      final saved = await repository.saveOption(
+        id: created.option!.id,
+        name: '街角小館（东街店）',
+        scenario: 'restaurant',
+        periods: periods,
+        confirmSameFood: true,
+      );
+      expect(saved.succeeded, isTrue);
+      expect(saved.option!.id, created.option!.id);
+    },
+  );
+
   Future<void> reopen() async {
     await repository.close();
     repository = await MealRepository.open(
@@ -88,6 +116,98 @@ void main() {
     await repository.close();
     await directory.delete(recursive: true);
   });
+
+  for (final names in [
+    ('街角小馆（东街店）', '街角小馆（東街店）'),
+    ('街角小馆（冬街店）', '街角小馆（东街店）'),
+    ('街角小馆（莘莊店）', '街角小馆（莘庄店）'),
+    ('肯德基（东街店）', 'KFC（東街店）'),
+    ('肯德基（冬街店）', '肯德基（东街店）'),
+    ('肯德基（冬街店）', '肯德基东街店'),
+    ('肯德基（莘莊店）', '肯德基（莘庄店）'),
+  ]) {
+    test(
+      'branch spelling correction requires confirmation: ${names.$1}',
+      () async {
+        final created = await repository.saveOption(
+          name: names.$1,
+          scenario: 'restaurant',
+          periods: periods,
+        );
+        expect(created.succeeded, isTrue);
+        final original = created.option!;
+        await confirm(original, 'branch-spelling-history');
+        final pending = await repository.saveOption(
+          id: original.id,
+          name: names.$2,
+          scenario: 'restaurant',
+          periods: periods,
+        );
+        expect(pending.status, OptionMutationStatus.renameConfirmationRequired);
+        expect(
+          (await repository.options())
+              .singleWhere((value) => value.id == original.id)
+              .name,
+          original.name,
+        );
+        final saved = await repository.saveOption(
+          id: original.id,
+          name: names.$2,
+          scenario: 'restaurant',
+          periods: periods,
+          confirmSameFood: true,
+        );
+        expect(saved.succeeded, isTrue);
+        expect(saved.option!.id, original.id);
+        expect(saved.option!.recognitionId, original.recognitionId);
+        await reopen();
+        final persisted = (await repository.options()).singleWhere(
+          (value) => value.id == original.id,
+        );
+        expect(persisted.name, names.$2);
+        expect(persisted.recognitionId, original.recognitionId);
+        final history = (await repository.history()).single;
+        expect(history.option.id, original.id);
+        expect(history.option.name, names.$2);
+        expect(history.operationId, 'branch-spelling-history');
+        expect(history.confirmedAt, DateTime(2026, 10, 10, 12).toUtc());
+        if (names.$2.contains('东街店') || names.$2.contains('東街店')) {
+          for (final confirmSameFood in [false, true]) {
+            final conflict = await repository.saveOption(
+              id: original.id,
+              name: '${names.$1.split('（').first}（西街店）',
+              scenario: 'restaurant',
+              periods: periods,
+              confirmSameFood: confirmSameFood,
+            );
+            expect(conflict.status, OptionMutationStatus.invalid);
+            expect((await repository.history()).single.option.name, names.$2);
+          }
+        }
+      },
+    );
+  }
+
+  test(
+    'explicit different branch remains invalid after confirmation',
+    () async {
+      final created = await repository.saveOption(
+        name: '街角小馆（东街店）',
+        scenario: 'restaurant',
+        periods: periods,
+      );
+      for (final confirmSameFood in [false, true]) {
+        final result = await repository.saveOption(
+          id: created.option!.id,
+          name: '街角小馆（西街店）',
+          scenario: 'restaurant',
+          periods: periods,
+          confirmSameFood: confirmSameFood,
+        );
+        expect(result.status, OptionMutationStatus.invalid);
+      }
+    },
+  );
 
   test(
     'ambiguous soy wording offers both protected options without hard blocking',
@@ -463,6 +583,8 @@ void main() {
           where: 'id = ?',
           whereArgs: [original.id],
         );
+        await database.execute('DROP TABLE online_recognition_requests');
+        await database.execute('DROP TABLE online_recognition_settings');
         await database.setVersion(7);
       } finally {
         await database.close();
@@ -529,6 +651,8 @@ void main() {
           where: 'id = ?',
           whereArgs: ['rice'],
         );
+        await database.execute('DROP TABLE online_recognition_requests');
+        await database.execute('DROP TABLE online_recognition_settings');
         await database.execute('PRAGMA user_version = 7');
       } finally {
         await database.close();

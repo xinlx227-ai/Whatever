@@ -214,25 +214,26 @@ void main() {
     );
   });
 
-  testWidgets('uncertain duplicates allow inspection and explicit creation', (
-    tester,
-  ) async {
-    final selected = startRound();
-    await mountEditor(tester);
-    await tester.enterText(name, '牛肉面特色版');
-    await tapSave(tester);
-    expect(find.text('可能已有相似选项'), findsOneWidget);
-    expect(controller.result, same(selected));
-    await answerSaveDialog(tester, '查看已有选项');
-    expect(find.text('返回表单'), findsOneWidget);
-    await answerSaveDialog(tester, '返回表单');
-    expect(find.text('仍然添加'), findsOneWidget);
-    await answerSaveDialog(tester, '仍然添加');
-    expect(find.byType(OptionEditor), findsNothing);
-    expect(controller.options.any((value) => value.name == '牛肉面特色版'), isTrue);
-    expect(controller.hasRound, isFalse);
-    expect(controller.takeRestartNotice(), isNotNull);
-  });
+  testWidgets(
+    'uncertain duplicates preserve draft and allow explicit creation',
+    (tester) async {
+      final selected = startRound();
+      await mountEditor(tester);
+      await tester.enterText(name, '牛肉面特色版');
+      await tapSave(tester);
+      expect(find.text('可能已有相似选项'), findsOneWidget);
+      expect(controller.result, same(selected));
+      await answerSaveDialog(tester, '返回编辑');
+      expect(find.byType(OptionEditor), findsOneWidget);
+      await tapSave(tester);
+      expect(find.text('保存新项'), findsOneWidget);
+      await answerSaveDialog(tester, '保存新项');
+      expect(find.byType(OptionEditor), findsNothing);
+      expect(controller.options.any((value) => value.name == '牛肉面特色版'), isTrue);
+      expect(controller.hasRound, isFalse);
+      expect(controller.takeRestartNotice(), isNotNull);
+    },
+  );
 
   testWidgets('confirmed added ingredients block creation with no override', (
     tester,

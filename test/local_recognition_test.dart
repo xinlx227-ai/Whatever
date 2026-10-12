@@ -152,6 +152,10 @@ void main() {
       expect(recognition.matchesSearch(east, '肯德基（西街店）'), isFalse);
       expect(
         recognition.compare('街角小馆（东街店）', '街角小馆（西街店）', 'restaurant'),
+        NameMatch.different,
+      );
+      expect(
+        recognition.compare('街角小馆（东街店）', '街角小館（东街店）', 'restaurant'),
         NameMatch.unknown,
       );
     },

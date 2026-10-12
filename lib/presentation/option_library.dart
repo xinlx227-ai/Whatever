@@ -5,6 +5,7 @@ import '../domain/meal.dart';
 import 'category_manager.dart';
 import 'option_art.dart';
 import 'option_editor.dart';
+import 'online_recognition_settings.dart';
 import 'scenario_selector.dart';
 
 class OptionLibrary extends StatefulWidget {
@@ -90,9 +91,27 @@ class _OptionLibraryState extends State<OptionLibrary> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 32),
-        const Text(
-          '每一餐的灵感',
-          style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                '每一餐的灵感',
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
+              ),
+            ),
+            IconButton(
+              key: const Key('library-settings'),
+              tooltip: '设置',
+              icon: const Icon(Icons.settings_outlined),
+              onPressed: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      OnlineRecognitionSettingsPage(controller: model),
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 8),
         Text(

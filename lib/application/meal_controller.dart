@@ -7,6 +7,8 @@ import '../data/meal_repository.dart';
 import '../domain/meal.dart';
 import '../domain/local_recognition.dart';
 import '../domain/meal_preferences.dart';
+import '../domain/online_recognition_settings.dart';
+import '../data/online_recognition_transport.dart';
 
 enum ReplacementChoice { redraw, exclude }
 
@@ -15,12 +17,63 @@ class MealController extends ChangeNotifier {
     required MealRepository repository,
     DateTime Function()? clock,
     Random? random,
+    OnlineRecognitionTransport Function()? onlineTransportFactory,
+    this.onlineApiKey = const String.fromEnvironment('MIMO_API_KEY'),
   }) : _repository = repository,
+       onlineTransportFactory =
+           onlineTransportFactory ?? HttpOnlineRecognitionTransport.new,
        _clock = clock ?? DateTime.now,
        _random = random ?? Random(),
        _period = MealPeriod.at((clock ?? DateTime.now)().toLocal());
 
   final MealRepository _repository;
+  final OnlineRecognitionTransport Function() onlineTransportFactory;
+  final String onlineApiKey;
+  OnlineRecognitionSettings _onlineSettings = const OnlineRecognitionSettings();
+  OnlineRecognitionSettings get onlineSettings => _onlineSettings;
+  bool _updatingOnlineSettings = false;
+
+  Future<bool> setOnlineRecognition({
+    required bool enabled,
+    bool? consent,
+  }) async {
+    if (_updatingOnlineSettings || _disposed) return false;
+    _updatingOnlineSettings = true;
+    final next = OnlineRecognitionSettings(
+      consentAsked: consent != null || _onlineSettings.consentAsked,
+      consentGranted: consent ?? _onlineSettings.consentGranted,
+      enabled: enabled && (consent ?? _onlineSettings.consentGranted),
+    );
+    // Revoke immediately, even if persistence fails. In-flight work cannot apply.
+    if (!next.enabled) {
+      _onlineSettings = next;
+      _notify();
+    }
+    try {
+      await _repository.saveOnlineRecognitionSettings(next);
+      _onlineSettings = next;
+      _notify();
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      _updatingOnlineSettings = false;
+    }
+  }
+
+  Future<bool> reserveOnlineRequest() async {
+    if (!_onlineSettings.enabled ||
+        !_onlineSettings.consentGranted ||
+        _disposed) {
+      return false;
+    }
+    try {
+      return await _repository.reserveOnlineRecognitionRequest(_clock());
+    } catch (_) {
+      return false;
+    }
+  }
+
   final DateTime Function() _clock;
   final Random _random;
   final Random _operationRandom = Random.secure();
@@ -309,6 +362,7 @@ class MealController extends ChangeNotifier {
     bool confirmSameFood = false,
     bool allowUncertainDuplicate = false,
     String? restoreOptionId,
+    String? advisoryRestoreOptionId,
   }) {
     // Snapshot mutable form input before entering the serialized write queue.
     final selectedPeriods = Set<MealPeriod>.of(periods);
@@ -326,6 +380,7 @@ class MealController extends ChangeNotifier {
         confirmSameFood: confirmSameFood,
         allowUncertainDuplicate: allowUncertainDuplicate,
         restoreOptionId: restoreOptionId,
+        advisoryRestoreOptionId: advisoryRestoreOptionId,
       ),
     );
   }
@@ -413,6 +468,7 @@ class MealController extends ChangeNotifier {
       _categories = await _repository.categories();
       _history = await _repository.history();
       _preferences = await _repository.preferences();
+      _onlineSettings = await _repository.onlineRecognitionSettings();
       _dataUnavailable = false;
       _error = null;
     } catch (_) {

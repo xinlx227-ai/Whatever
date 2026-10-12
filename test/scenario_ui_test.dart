@@ -195,6 +195,11 @@ void main() {
       await tap(tester, find.byKey(const Key('create-option')));
       expect(find.text('添加喜欢的餐厅'), findsOneWidget);
       await tester.enterText(find.byKey(const Key('option-name')), '街角小馆');
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pumpAndSettle();
+      expect(find.text('开启在线识别？'), findsOneWidget);
+      await tester.runAsync(() => tester.tap(find.text('仅用本地')));
+      await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const Key('option-address')),
         '春风路 8 号',

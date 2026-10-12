@@ -1,0 +1,133 @@
+{
+  "baseCommit": "66a5ae4b59b721a34c593d01964f99ecb58bbeee",
+  "branch": "codex/issue-15-online-recognition",
+  "verifiedOn": "2026-10-12",
+  "timezone": "Asia/Shanghai",
+  "scope": "Changed implementation, configuration and regression tests; unchanged files are supplied by baseCommit.",
+  "files": [
+    {
+      "path": "android/app/src/main/AndroidManifest.xml",
+      "sha256": "f6c1a11824edba34ac10a1fedefc4202c3065dc6f4c939b95056cfae5d51a8e0"
+    },
+    {
+      "path": "lib/application/meal_controller.dart",
+      "sha256": "fc4dbefd49e5c00259d99367e55cc701ae277b0d98787ceaaa69029f7c92a3ac"
+    },
+    {
+      "path": "lib/application/online_recognition_session.dart",
+      "sha256": "c9f04200a46b32e27debbf77d0f098d338ed23428a742dd79fa48b572ce084bc"
+    },
+    {
+      "path": "lib/data/meal_repository.dart",
+      "sha256": "6f2d63afe0e7caac754f443c5db9fa9216f92cd61265a906ee48df0649c2101b"
+    },
+    {
+      "path": "lib/data/online_recognition_transport.dart",
+      "sha256": "aac2aa2f46dfa2e5653e9908e886250dbdca5f79c9038af1e75746cbff8d6170"
+    },
+    {
+      "path": "lib/domain/local_recognition.dart",
+      "sha256": "102f7585fe1bf869ea7527803dfc8d71f4b36063ce3e340e6050c7d2f64cbaa1"
+    },
+    {
+      "path": "lib/domain/online_recognition_settings.dart",
+      "sha256": "08ee89ccd344c6be22e0d633e0a261e8265f5b19595af2826fb5ca720ded5c52"
+    },
+    {
+      "path": "lib/domain/online_recognition.dart",
+      "sha256": "cbdc114819cdd3bfc8585303b037f2987d777db3def395fa6cc78a8508ca119f"
+    },
+    {
+      "path": "lib/presentation/meal_app.dart",
+      "sha256": "689077bff32024198a13f989428c50c81dc34b87da80357ffe34960bf302e098"
+    },
+    {
+      "path": "lib/presentation/online_recognition_settings.dart",
+      "sha256": "6748481ebc89e8179e79d8cff35bb8adaa52e2046d60082d0862b5ea73ccb5ce"
+    },
+    {
+      "path": "lib/presentation/option_editor.dart",
+      "sha256": "f41d04927ebcd9dac53e15d315384f2a2145b48889fa6fac5a86751a5a8a66e5"
+    },
+    {
+      "path": "lib/presentation/option_library.dart",
+      "sha256": "e2041bca4aacc361fe0529dcb602117cbcb8174894158b8e03fcf30afd1f98f9"
+    },
+    {
+      "path": "scripts/build-online-apk.ps1",
+      "sha256": "a4c035689f5c46fce6b030d8461005bfc00b338dce9d025ddc2b3fd6c68a93ee"
+    },
+    {
+      "path": "test/batch_repository_test.dart",
+      "sha256": "f95fe5fa630b0bf6f08097b10bf6cabf9b6db2a79d80de7ee9e6fd5e18b25136"
+    },
+    {
+      "path": "test/category_repository_test.dart",
+      "sha256": "e855b82fce0b5adf94e73ea9cfcf626725dfe9ce75441f936e1ead8370296e63"
+    },
+    {
+      "path": "test/fixtures/local_recognition_cases.json",
+      "sha256": "e80da7358a052ab945eaab8c60a976f7cec46882d6c020ab13a6aaee3c544df8"
+    },
+    {
+      "path": "test/history_repository_test.dart",
+      "sha256": "6b18efd8bf3071096683bc0034f02ab87826ab4826d1450d885116c0bb3a4fbc"
+    },
+    {
+      "path": "test/library_actions_test.dart",
+      "sha256": "6f51722a74540d03af4076ca0fcaab4e6fe61b919fa98e6798f543db5230bd48"
+    },
+    {
+      "path": "test/local_recognition_test.dart",
+      "sha256": "7ef8b3b6f098c5fcd7ea5866809c450dee989b99360a90a9aa662bc26367bd27"
+    },
+    {
+      "path": "test/online_recognition_contract_test.dart",
+      "sha256": "bfec23df364334930305eca417fb5ff4a3e0103d7066e75ba531552c800d7cb9"
+    },
+    {
+      "path": "test/online_recognition_persistence_test.dart",
+      "sha256": "8ca8598a0b73beaa8ede028cde7aa888358ec2584e8768b8909de45a8dd710ed"
+    },
+    {
+      "path": "test/online_recognition_session_test.dart",
+      "sha256": "86a14625b664e5ce72d6ecbc6002fa3e768eb1d1e3c817d0fa83bf5a3b65e664"
+    },
+    {
+      "path": "test/online_recognition_ui_test.dart",
+      "sha256": "abab078e19bb41c0b28a537583357798706830b2c16c925acb2484bdebdb6065"
+    },
+    {
+      "path": "test/option_editor_test.dart",
+      "sha256": "1d34ed471368a68e978e4838a7df2b30de75b8995fe5364cff664299e6f54d16"
+    },
+    {
+      "path": "test/preferences_test.dart",
+      "sha256": "12d27016ea5b23fa6bb225c6acf3eab1db4d26c9fdc094feecce5e87fd3b1072"
+    },
+    {
+      "path": "test/recognition_repository_test.dart",
+      "sha256": "29a35667e339ff4e3bd338042e5f99fe4b410f66ebca39adbe665b816a086088"
+    },
+    {
+      "path": "test/scenario_repository_test.dart",
+      "sha256": "04c5588c5435af5dac0de101a6d74425225835b950c7a0b8c3dc683ec1aa9498"
+    },
+    {
+      "path": "test/scenario_ui_test.dart",
+      "sha256": "b6d32c5fe3529e2faad4eaaf2b151e5f0805decb6fc32b106acc65128b019a91"
+    }
+  ],
+  "verificationFollowUps": [
+    {
+      "apkRebuilt": false,
+      "previousSha256": "65dbf91a0b069aed623e73c7f655d1248a9280f8a8565c9a173e6250958d3638",
+      "checks": [
+        "flutter analyze --no-pub: passed",
+        "option_editor_test.dart + online_recognition_ui_test.dart: 44 passed"
+      ],
+      "scope": "lib/presentation/option_editor.dart",
+      "fullSuiteRerun": false
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 {
-  "datasetVersion": "2026-10-11.1",
+  "datasetVersion": "2026-10-12.2",
   "provenance": "Project-authored labels from accepted seed inventory and Issue 12 identity/branch decisions. A finite, non-independent regression corpus; no universal accuracy claim.",
   "cases": [
     {
@@ -2288,7 +2288,7 @@
       "scenario": "restaurant",
       "a": "街角小馆（东街店）",
       "b": "街角小馆（西街店）",
-      "expected": "unknown"
+      "expected": "different"
     },
     {
       "id": "LR-287",
@@ -2297,6 +2297,78 @@
       "a": "无名饭",
       "b": "无名面",
       "expected": "unknown"
+    },
+    {
+      "id": "LR-288",
+      "group": "outside-vocabulary",
+      "scenario": "restaurant",
+      "a": "街角小馆（东街店）",
+      "b": "街角小馆（東街店）",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-289",
+      "group": "outside-vocabulary",
+      "scenario": "restaurant",
+      "a": "街角小馆（冬街店）",
+      "b": "街角小馆（东街店）",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-290",
+      "group": "outside-vocabulary",
+      "scenario": "restaurant",
+      "a": "街角小馆（莘莊店）",
+      "b": "街角小馆（莘庄店）",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-291",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "肯德基（东街店）",
+      "b": "KFC（東街店）",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-292",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "肯德基（莘莊店）",
+      "b": "肯德基（莘庄店）",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-293",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "肯德基（莘庄店）",
+      "b": "肯德基（中山店）",
+      "expected": "uncertain"
+    },
+    {
+      "id": "LR-294",
+      "group": "outside-vocabulary",
+      "scenario": "restaurant",
+      "a": "街角小馆（莘庄店）",
+      "b": "街角小馆（中山店）",
+      "expected": "unknown"
+    },
+    {
+      "id": "LR-295",
+      "group": "restaurant-branch",
+      "scenario": "restaurant",
+      "a": "KFC（東街店）",
+      "b": "肯德基（西街店）",
+      "expected": "different"
+    },
+    {
+      "id": "LR-296",
+      "group": "outside-vocabulary",
+      "scenario": "restaurant",
+      "a": "古茗（人民路店）",
+      "b": "古茗（茶山店）",
+      "expected": "different"
     }
   ]
 }

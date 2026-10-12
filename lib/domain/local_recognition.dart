@@ -7,7 +7,7 @@ enum NameMatch { confirmed, uncertain, different, unknown }
 class LocalRecognition {
   const LocalRecognition();
 
-  static const datasetVersion = '2026-10-11.1';
+  static const datasetVersion = '2026-10-12.2';
 
   String? identity(String name, String scenario) {
     final resolved = _resolve(name, scenario);
@@ -29,7 +29,26 @@ class LocalRecognition {
     final keyA = _validIdentity(identityA, scenario) ?? identity(a, scenario);
     final keyB = _validIdentity(identityB, scenario) ?? identity(b, scenario);
     if (keyA != null && keyB != null) {
-      return keyA == keyB ? NameMatch.confirmed : NameMatch.different;
+      if (keyA == keyB) return NameMatch.confirmed;
+      if (scenario == MealScenario.restaurant.name) {
+        final left = keyA.split('#branch:');
+        final right = keyB.split('#branch:');
+        if (left.first == right.first &&
+            left.length == 2 &&
+            right.length == 2) {
+          // An unresolved retained branch label must not hide definite
+          // location conflicts in the current names after a spelling rename.
+          // Otherwise corrections still need explicit confirmation.
+          return _distinctBranches(left.last, right.last) ||
+                  _explicitIdentityConflict(normalizedA, normalizedB, scenario)
+              ? NameMatch.different
+              : NameMatch.uncertain;
+        }
+      }
+      return NameMatch.different;
+    }
+    if (_explicitIdentityConflict(normalizedA, normalizedB, scenario)) {
+      return NameMatch.different;
     }
     // Evidence must be lexical and bounded; punctuation and token boundaries
     // alone do not make otherwise unknown names equivalent.
@@ -49,6 +68,35 @@ class LocalRecognition {
       }
     }
     return NameMatch.unknown;
+  }
+
+  bool _explicitIdentityConflict(String a, String b, String scenario) {
+    if (scenario == MealScenario.restaurant.name) {
+      final pattern = RegExp(r'^(.+)\(([^()]+店)\)$');
+      String? branchLabel(String name) {
+        final resolved = _resolve(name, scenario);
+        if (resolved != null && resolved.branch.startsWith('#branch:')) {
+          return resolved.branch.substring('#branch:'.length);
+        }
+        return pattern
+            .firstMatch(name.replaceAll(RegExp(r'\s+'), ''))
+            ?.group(2);
+      }
+
+      final left = branchLabel(a);
+      final right = branchLabel(b);
+      // Only enumerated location contrasts prove different branches. Script
+      // variants or arbitrary spelling differences cannot veto a correction.
+      return left != null && right != null && _distinctBranches(left, right);
+    }
+    String form(String value) => value
+        .replaceAll('餛飩', '馄饨')
+        .replaceAll('雲吞', '馄饨')
+        .replaceAll('云吞', '馄饨')
+        .replaceAll('麵', '面');
+    final left = form(a);
+    final right = form(b);
+    return (left == '馄饨' && right == '馄饨面') || (right == '馄饨' && left == '馄饨面');
   }
 
   bool matchesSearch(FoodOption option, String query) {
@@ -256,6 +304,22 @@ class _Resolved {
 }
 
 final _branch = RegExp(r'^(?:\(([^()]+店)\)|([^()]+店))$');
+// Curated negative evidence only: these labels never create positive aliases
+// or change retained branch identity keys. Unlisted labels remain unresolved.
+const _branchLocations = <String, String>{
+  '东街店': 'east-street',
+  '東街店': 'east-street',
+  '西街店': 'west-street',
+  '人民路店': 'people-road',
+  '茶山店': 'tea-mountain',
+};
+
+bool _distinctBranches(String a, String b) {
+  final left = _branchLocations[a];
+  final right = _branchLocations[b];
+  return left != null && right != null && left != right;
+}
+
 // Longest tokens come first. The cursor only moves forward, so malformed
 // trailing text takes linear time and never triggers regex backtracking.
 const _modifierTokens = [

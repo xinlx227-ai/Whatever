@@ -49,7 +49,7 @@ void main() {
         expect(await db.query('history_records'), hasLength(records));
         expect(await db.query('history_items'), hasLength(items));
         expect(await db.rawQuery('PRAGMA foreign_key_check'), isEmpty);
-        expect(await db.getVersion(), 8);
+        expect(await db.getVersion(), 9);
       });
 
   setUp(() async {

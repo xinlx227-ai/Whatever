@@ -6,6 +6,7 @@ import 'package:sqflite_common/sqlite_api.dart';
 import '../domain/local_recognition.dart';
 import '../domain/meal.dart';
 import '../domain/meal_preferences.dart';
+import '../domain/online_recognition_settings.dart';
 
 enum ConfirmationPhase {
   afterHeaderWritten,
@@ -30,7 +31,7 @@ class MealRepository {
     final database = await factory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-        version: 8,
+        version: 9,
         onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
         onCreate: (database, version) async {
           await database.execute('''
@@ -70,6 +71,7 @@ class MealRepository {
           await _addCardTutorialPreference(database);
           await _addCardCollectionTutorialPreference(database);
           await _addRecognitionIdentity(database);
+          await _addOnlineRecognition(database);
         },
         onUpgrade: (database, oldVersion, newVersion) async {
           if (oldVersion < 2) {
@@ -93,11 +95,89 @@ class MealRepository {
           if (oldVersion < 8) {
             await _addRecognitionIdentity(database);
           }
+          if (oldVersion < 9) {
+            await _addOnlineRecognition(database);
+          }
         },
       ),
     );
     return MealRepository._(database, onConfirmationPhase);
   }
+
+  static Future<void> _addOnlineRecognition(DatabaseExecutor database) async {
+    await database.execute('''
+      CREATE TABLE online_recognition_settings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        consent_asked INTEGER NOT NULL CHECK (consent_asked IN (0, 1)),
+        consent_granted INTEGER NOT NULL CHECK (consent_granted IN (0, 1)),
+        enabled INTEGER NOT NULL CHECK (enabled IN (0, 1))
+      )
+    ''');
+    await database.insert('online_recognition_settings', {
+      'id': 1,
+      'consent_asked': 0,
+      'consent_granted': 0,
+      'enabled': 0,
+    });
+    await database.execute('''
+      CREATE TABLE online_recognition_requests (
+        id INTEGER PRIMARY KEY,
+        reserved_at INTEGER NOT NULL,
+        calendar_day TEXT NOT NULL
+      )
+    ''');
+  }
+
+  Future<OnlineRecognitionSettings> onlineRecognitionSettings() async {
+    final row = (await _database.query('online_recognition_settings')).single;
+    return OnlineRecognitionSettings(
+      consentAsked: row['consent_asked'] == 1,
+      consentGranted: row['consent_granted'] == 1,
+      enabled: row['enabled'] == 1,
+    );
+  }
+
+  Future<void> saveOnlineRecognitionSettings(
+    OnlineRecognitionSettings settings,
+  ) async {
+    await _database.update('online_recognition_settings', {
+      'consent_asked': settings.consentAsked ? 1 : 0,
+      'consent_granted': settings.consentGranted ? 1 : 0,
+      'enabled': settings.enabled && settings.consentGranted ? 1 : 0,
+    }, where: 'id = 1');
+  }
+
+  // Reserve before dispatch, so failures and process restarts cannot refund a
+  // sent request. Consent and request freshness are checked by the coordinator.
+  Future<bool> reserveOnlineRecognitionRequest(DateTime now) =>
+      _database.transaction((transaction) async {
+        final local = now.toLocal();
+        final calendarDay =
+            '${local.year}-${local.month.toString().padLeft(2, '0')}-'
+            '${local.day.toString().padLeft(2, '0')}';
+        final reservedAt = now.microsecondsSinceEpoch;
+        final minuteStart = now
+            .subtract(const Duration(minutes: 1))
+            .microsecondsSinceEpoch;
+        // Keep the previous day's reservations across midnight while they
+        // still count toward the rolling minute; retain today's daily count.
+        await transaction.delete(
+          'online_recognition_requests',
+          where: 'calendar_day != ? AND reserved_at <= ?',
+          whereArgs: [calendarDay, minuteStart],
+        );
+        final rows = await transaction.query('online_recognition_requests');
+        final daily = rows.where((row) => row['calendar_day'] == calendarDay);
+        final recent = rows.where(
+          (row) => (row['reserved_at']! as int) > minuteStart,
+        );
+        if (daily.length >= 30 || recent.length >= 6) return false;
+        await transaction.insert('online_recognition_requests', {
+          'reserved_at': reservedAt,
+          'calendar_day': calendarDay,
+        });
+        return true;
+      });
 
   static Future<void> _addRecognitionIdentity(DatabaseExecutor database) async {
     await database.execute(
@@ -557,6 +637,7 @@ class MealRepository {
     bool confirmSameFood = false,
     bool allowUncertainDuplicate = false,
     String? restoreOptionId,
+    String? advisoryRestoreOptionId,
   }) => _database.transaction((transaction) async {
     final displayName = name.trim();
     if (!MealScenario.values.any((value) => value.name == scenario)) {
@@ -625,6 +706,32 @@ class MealRepository {
     final nameChanged =
         original == null || normalizedOptionName(original.name) != normalized;
     final enteredIdentity = recognition.identity(displayName, scenario);
+    FoodOption? advisoryRestore;
+    if (advisoryRestoreOptionId != null) {
+      advisoryRestore = options
+          .where((option) => option.id == advisoryRestoreOptionId)
+          .firstOrNull;
+      if (id != null ||
+          (restoreOptionId != null &&
+              restoreOptionId != advisoryRestoreOptionId) ||
+          advisoryRestore == null ||
+          advisoryRestore.scenario != scenario ||
+          !advisoryRestore.isDeleted ||
+          advisoryRestore.isBuiltIn ||
+          recognition.compare(
+                displayName,
+                advisoryRestore.name,
+                scenario,
+                identityA: enteredIdentity,
+                identityB: advisoryRestore.recognitionId,
+              ) ==
+              NameMatch.different) {
+        return const OptionMutationResult(
+          OptionMutationStatus.invalid,
+          message: '无法恢复这个选项，请重新检查已有选项。',
+        );
+      }
+    }
     NameMatch? renameMatch;
     if (id != null && nameChanged) {
       renameMatch = recognition.compare(
@@ -678,9 +785,10 @@ class MealRepository {
           : null;
       if (id == null &&
           matches.every((value) => value.isDeleted && !value.isBuiltIn)) {
-        final selected = restoreOptionId == null
+        final selectedId = advisoryRestoreOptionId ?? restoreOptionId;
+        final selected = selectedId == null
             ? onlyMatch
-            : matches.where((value) => value.id == restoreOptionId).firstOrNull;
+            : matches.where((value) => value.id == selectedId).firstOrNull;
         if (!confirmRestore || selected == null) {
           return OptionMutationResult(
             OptionMutationStatus.restorationRequired,
@@ -707,13 +815,29 @@ class MealRepository {
         );
       }
     }
-    if (uncertain.isNotEmpty && !allowUncertainDuplicate) {
+    final unresolvedUncertain = uncertain
+        .where((option) => option.id != advisoryRestoreOptionId)
+        .toList();
+    if (unresolvedUncertain.isNotEmpty && !allowUncertainDuplicate) {
       return OptionMutationResult(
         OptionMutationStatus.uncertainDuplicate,
-        option: uncertain.length == 1 ? uncertain.single : null,
-        matches: List.unmodifiable(uncertain),
+        option: unresolvedUncertain.length == 1
+            ? unresolvedUncertain.single
+            : null,
+        matches: List.unmodifiable(unresolvedUncertain),
         message: '可能已有类似餐食，请查看已有选项，或确认后仍然保存。',
       );
+    }
+    if (advisoryRestore != null) {
+      if (!confirmRestore) {
+        return OptionMutationResult(
+          OptionMutationStatus.restorationRequired,
+          option: advisoryRestore,
+          matches: List.unmodifiable([advisoryRestore]),
+          message: '恢复后会保存本表单的名称、分类、时段等内容，并保留原有足迹。',
+        );
+      }
+      original = advisoryRestore;
     }
     if (id != null &&
         nameChanged &&

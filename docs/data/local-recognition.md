@@ -4,7 +4,9 @@ Read this document when changing recognition rules, alias/category records, or t
 
 ## Version and provenance
 
-Dataset version: `2026-10-11.1`.
+Dataset/rule version: `2026-10-12.2`.
+
+Issue #15 adds bounded negative evidence for wontons versus wonton noodles (馄饨 / 馄饨面, including enumerated script variants) and bounded restaurant branch contrasts, including unknown brands. Version 2026-10-12.2 fixes script/spelling corrections being mistaken for distinct branches: only the curated East Street (东街店 / 東街店), West Street (西街店), People Road (人民路店), and Tea Mountain (茶山店) labels supply negative location evidence. Unequal labels outside this evidence remain unresolved. These labels do not create positive aliases. Known brand aliases are resolved first. No positive aliases or persistent recognition IDs were added. The local regression label LR-286 changes from unknown to different; historical S11 measurements and all frozen online experiment artifacts remain unchanged.
 
 This project-maintained dataset contains 73 scenario records: the approved 32 eating, 26 cooking, and 12 restaurant seed entries, plus three boundary records for tomato egg soup (番茄鸡蛋汤), tomato egg rice bowl (番茄鸡蛋盖饭), and chicken noodles (鸡肉面). Scenario entries are not globally distinct foods. The two millet/pumpkin porridge entries each occur in both food inventories.
 
@@ -21,7 +23,7 @@ No third-party dataset, online inference, external API, or unverified accuracy b
 
 ## Identity and parsing
 
-`identity` returns a scenario-qualified stable record ID. Known food names are available in both eating and cooking scenarios; restaurant records remain restaurant-only. A restaurant branch adds its complete normalized branch label to the brand identity. A brand option, its East Street branch, and its West Street branch are separate identities. Parenthesized and plain branch suffixes ending in “branch/shop” (店) are supported. Arbitrary branch names outside known brands retain normalized exact-name comparison and otherwise abstain.
+`identity` returns a scenario-qualified stable record ID. Known food names are available in both eating and cooking scenarios; restaurant records remain restaurant-only. A restaurant branch adds its complete normalized branch label to the brand identity. A brand option, its East Street branch, and its West Street branch are separate identities. Parenthesized and plain branch suffixes ending in “branch/shop” (店) are supported. Unknown brands retain exact-name comparison and otherwise abstain, except for the bounded parenthesized branch contrasts above. For known brands, unequal branch labels without a curated contrast remain uncertain; different known brands and brand-only versus branch identities remain distinct. Explicit rename confirmation preserves the original option ID, retained recognition ID, and history linkage.
 
 Normalization reuses `normalizedOptionName`: width equivalence, English case folding, outer trim, and collapsed spaces preserve punctuation and word boundaries. Curated aliases supply the explicitly supported punctuation/name alternatives.
 
@@ -38,11 +40,13 @@ A saved `FoodOption.recognitionId` preserves known semantic identity after a use
 | Outcome | Evidence | Consumer behavior |
 | --- | --- | --- |
 | `confirmed` | Normalized exact name or equal recognized/persisted identities | Enforce duplicate handling. |
-| `different` | Two distinct recognized identities, including branch distinctions | Keep identities distinct; reject a clear different-food rename. |
-| `uncertain` | Recognized-name containment/decorations or a one-edit Chinese near-spelling involving a known name | Offer a warning, never a hard duplicate block. |
+| `different` | Distinct recognized food/brand identities, brand-versus-branch identity, or bounded explicit food-form/branch conflicts | Keep identities distinct; reject a clear different-food rename. |
+| `uncertain` | Unresolved labels under the same known brand, recognized-name containment/decorations, or a one-edit Chinese near-spelling involving a known name | Offer a warning, never a hard duplicate block. |
 | `unknown` | Insufficient supported semantic evidence | Preserve uncertainty and existing rename-confirmation policy. |
 
 For rename checks, derive the proposed new identity independently before retaining the old identity. Passing the retained identity as evidence for the proposed new name before that check would conceal a known different-food rename.
+
+When retained same-brand branch keys differ without a known location contrast, current display names still supply bounded negative evidence. This prevents a confirmed spelling correction from hiding a later definite branch change; both parenthesized and plain suffixes are checked for known brands.
 
 ## Categories and search
 
@@ -54,7 +58,7 @@ Alias search checks the current display name, curated identity aliases, and comp
 
 ## Evaluation and maintenance
 
-The frozen corpus has 287 labeled comparison cases:
+The versioned local regression corpus has 296 labeled comparison cases:
 
 | Group | Cases |
 | --- | ---: |
@@ -63,11 +67,11 @@ The frozen corpus has 287 labeled comparison cases:
 | Complete seasoning suffixes | 58 |
 | Optional additions | 20 |
 | Protected distinct foods | 29 |
-| Restaurant branches | 26 |
+| Restaurant branches | 30 |
 | Unsupported variants/ambiguous wording/near-spelling warnings | 23 |
-| Outside vocabulary | 22 |
+| Outside vocabulary | 27 |
 
-Expected outcomes are 189 confirmed, 53 different, 23 uncertain, and 22 unknown. The branch group includes two positive formatting/brand-alias cases and 24 negative branch/brand distinctions.
+Expected outcomes are 189 confirmed, 56 different, 26 uncertain, and 25 unknown. The branch group includes two positive formatting/brand-alias cases, 25 negative branch/brand distinctions, and three uncertain branch-label cases. LR-286 and LR-296 cover explicit branch contrasts in the outside-vocabulary group; LR-288 through LR-295 also cover script/spelling corrections and unsupported locations.
 
 The evaluation test prints observed confirmed precision, positive recall, semantic decision coverage, uncertain/unknown rates, and false hard blocks with denominators. Read the actual test output for measured results. This finite project-authored corpus is regression evidence; it is not independent real-world validation or a guarantee for unseen names. Semantic decision coverage intentionally excludes uncertain and unknown cases.
 
@@ -75,7 +79,7 @@ When changing the dataset:
 
 1. Keep existing identity keys stable. Add a new record for a distinct principal ingredient or food form.
 2. Add only explicit, defensible alias/category evidence and bump `datasetVersion`.
-3. Add independently labeled positive, protected-negative, and unsupported examples to the frozen fixture; align its version.
+3. Add independently labeled positive, protected-negative, and unsupported examples to the versioned fixture; align its version and explain any changed expectations. Preserve historical research freezes separately.
 4. Run `flutter test test/local_recognition_test.dart` and the repository/editor/controller regression checks sequentially on Windows. Inspect every disagreement and the printed denominators before accepting the new version.
 
 Inventory, classification, opaque-rename identity/search, restaurant search, custom-category ambiguity, scenario isolation, and complete suffix consumption have additional focused tests outside the comparison corpus.

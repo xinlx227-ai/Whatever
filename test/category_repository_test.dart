@@ -485,7 +485,7 @@ void main() {
       );
       final inspector = await inspect();
       try {
-        expect(await inspector.getVersion(), 8);
+        expect(await inspector.getVersion(), 9);
         expect(
           await inspector.query(
             'options',
