@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import '../application/meal_controller.dart';
@@ -71,6 +72,8 @@ class _CardDrawState extends State<CardDraw> with TickerProviderStateMixin {
   final stageKey = GlobalKey();
   final collectionSourceKey = GlobalKey();
   final collectionTargetKey = GlobalKey();
+  final centralSemanticsKey = GlobalKey();
+  String? previousCentralId;
   FoodOption? collectingOption;
   Offset collectionStart = Offset.zero;
   Offset collectionEnd = Offset.zero;
@@ -78,9 +81,10 @@ class _CardDrawState extends State<CardDraw> with TickerProviderStateMixin {
   double collectionEndScale = .5;
   MealController get model => widget.controller;
   static const cardWidth = 82.0;
-  static const cardStep = 44.0;
+  // Independent touch strips meet Android's 48dp minimum despite overlapping art.
+  static const cardStep = 48.0;
   static const cardHeight = 132.0;
-  // Preserve the original travel distance within the existing shuffle timing.
+  // Preserve the two-lap rhythm within the existing shuffle timing.
   static const shuffleLaps = 2;
   static double fanInset(int count, double viewport) => math.max(
     20.0,
@@ -164,6 +168,20 @@ class _CardDrawState extends State<CardDraw> with TickerProviderStateMixin {
       selection.value = model.selectedCardIndex == null ? 1 : 0;
       syncMotion();
     }
+    final centralId = model.isDrawing ? null : model.cardCentralResult?.id;
+    if (centralId != null && centralId != previousCentralId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || model.cardCentralResult?.id != centralId) return;
+        if (!MediaQuery.accessibleNavigationOf(context)) return;
+        final target = centralSemanticsKey.currentContext;
+        if (target == null) return;
+        Scrollable.ensureVisible(target, duration: Duration.zero);
+        target.findRenderObject()?.sendSemanticsEvent(
+          const FocusSemanticEvent(),
+        );
+      });
+    }
+    previousCentralId = centralId;
     if (mounted) setState(() {});
   }
 
@@ -352,6 +370,9 @@ class _CardDrawState extends State<CardDraw> with TickerProviderStateMixin {
     builder: (context, _) {
       final colors = Theme.of(context).colorScheme;
       final deck = model.cardDeck;
+      final count = deck.length;
+      final canInteract = interactionsEnabled;
+      final canActivateCard = canInteract && model.canDraw;
       return Stack(
         key: stageKey,
         clipBehavior: Clip.none,
@@ -359,7 +380,7 @@ class _CardDrawState extends State<CardDraw> with TickerProviderStateMixin {
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              centralCard(),
+              centralCard(count, canInteract: canInteract),
               const SizedBox(height: 12),
               LayoutBuilder(
                 builder: (context, constraints) {
@@ -369,36 +390,62 @@ class _CardDrawState extends State<CardDraw> with TickerProviderStateMixin {
                     child: GestureDetector(
                       key: const Key('card-fan-blank'),
                       behavior: HitTestBehavior.opaque,
-                      onTap: interactionsEnabled
-                          ? model.cancelCardSelection
-                          : null,
-                      child: SingleChildScrollView(
-                        key: const Key('card-fan-scroll'),
-                        controller: browsing,
-                        scrollDirection: Axis.horizontal,
-                        physics: interactionsEnabled
-                            ? const ClampingScrollPhysics()
-                            : const NeverScrollableScrollPhysics(),
-                        child: SizedBox(
-                          width: math.max(
-                            viewport,
-                            cardWidth +
-                                40 +
-                                math.max(0, deck.length - 1) * cardStep,
+                      onTap: canInteract ? model.cancelCardSelection : null,
+                      child: Stack(
+                        children: [
+                          ListView.builder(
+                            key: const Key('card-fan-scroll'),
+                            controller: browsing,
+                            scrollDirection: Axis.horizontal,
+                            physics: canInteract
+                                ? const ClampingScrollPhysics()
+                                : const NeverScrollableScrollPhysics(),
+                            scrollCacheExtent: const ScrollCacheExtent.pixels(
+                              cardStep * 2,
+                            ),
+                            itemExtent: cardStep,
+                            itemCount: count,
+                            semanticChildCount: count,
+                            padding: EdgeInsets.only(
+                              left: fanInset(count, viewport),
+                              right:
+                                  fanInset(count, viewport) +
+                                  cardWidth -
+                                  cardStep,
+                            ),
+                            itemBuilder: (context, slot) {
+                              final progress = initialShuffle
+                                  ? ((shuffle.value - .32) / .68).clamp(
+                                      0.0,
+                                      1.0,
+                                    )
+                                  : shuffle.value;
+                              final travel =
+                                  shuffleTravel(count) *
+                                  Curves.easeInOut.transform(progress);
+                              final index = shuffling && progress > 0
+                                  ? (slot + travel.ceil()) % count
+                                  : slot;
+                              return fanCard(
+                                index,
+                                count,
+                                viewport,
+                                slot,
+                                enabled: canActivateCard,
+                              );
+                            },
                           ),
-                          child: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              for (final index in fanOrder(deck.length))
-                                if (index != model.selectedCardIndex)
-                                  fanCard(index, deck.length, viewport),
-                              if (model.selectedCardIndex
-                                  case final int selected)
-                                if (!model.isDrawing)
-                                  fanCard(selected, deck.length, viewport),
-                            ],
-                          ),
-                        ),
+                          if (model.selectedCardIndex case final selected?)
+                            if (!model.isDrawing && !shuffling)
+                              fanCard(
+                                selected,
+                                count,
+                                viewport,
+                                selected,
+                                enabled: canActivateCard,
+                                overlay: true,
+                              ),
+                        ],
                       ),
                     ),
                   );
@@ -410,13 +457,13 @@ class _CardDrawState extends State<CardDraw> with TickerProviderStateMixin {
                   IconButton(
                     key: const Key('browse-cards-back'),
                     tooltip: '向前浏览卡牌',
-                    onPressed: interactionsEnabled ? () => browse(-1) : null,
+                    onPressed: canInteract ? () => browse(-1) : null,
                     icon: const Icon(Icons.chevron_left),
                   ),
                   Semantics(
                     liveRegion: true,
                     child: Text(
-                      shuffling ? '正在洗牌…' : '${deck.length} 张牌',
+                      shuffling ? '正在洗牌…' : '$count 张牌',
                       key: const Key('card-deck-status'),
                       style: TextStyle(color: colors.onSurfaceVariant),
                     ),
@@ -424,16 +471,12 @@ class _CardDrawState extends State<CardDraw> with TickerProviderStateMixin {
                   IconButton(
                     key: const Key('browse-cards-forward'),
                     tooltip: '向后浏览卡牌',
-                    onPressed: interactionsEnabled ? () => browse(1) : null,
+                    onPressed: canInteract ? () => browse(1) : null,
                     icon: const Icon(Icons.chevron_right),
                   ),
                 ],
               ),
-              if (!model.isSingleTarget) collectedRow(),
-              if (!model.preferences.cardTutorialDismissed ||
-                  (!model.isSingleTarget &&
-                      !model.preferences.cardCollectionTutorialDismissed))
-                tutorialGuidance(),
+              if (!model.isSingleTarget) collectedRow(canInteract: canInteract),
               const SizedBox(height: 8),
             ],
           ),
@@ -443,7 +486,7 @@ class _CardDrawState extends State<CardDraw> with TickerProviderStateMixin {
     },
   );
 
-  Widget centralCard() {
+  Widget centralCard(int count, {required bool canInteract}) {
     if (collectingOption != null) {
       return SizedBox(height: collectionSize.height);
     }
@@ -454,11 +497,11 @@ class _CardDrawState extends State<CardDraw> with TickerProviderStateMixin {
       return GestureDetector(
         key: const Key('card-center-blank'),
         behavior: HitTestBehavior.opaque,
-        onTap: interactionsEnabled ? model.cancelCardSelection : null,
+        onTap: canInteract ? model.cancelCardSelection : null,
         child: Container(
           constraints: const BoxConstraints(minHeight: 264),
           alignment: Alignment.center,
-          child: model.cardDeck.isEmpty
+          child: count == 0
               ? Text(
                   model.results.isEmpty ? '没有符合条件的选项' : '本餐已选好',
                   textAlign: TextAlign.center,
@@ -479,13 +522,13 @@ class _CardDrawState extends State<CardDraw> with TickerProviderStateMixin {
     final offset = browsing.hasClients ? browsing.offset : 0.0;
     final viewport = MediaQuery.sizeOf(context).width - 48;
     final startX =
-        (fanInset(model.cardDeck.length, viewport) +
+        (fanInset(count, viewport) +
                 (model.selectedCardIndex ?? 0) * cardStep -
                 offset +
                 cardWidth / 2 -
                 viewport / 2)
             .clamp(-140.0, 140.0);
-    final canCollect = interactionsEnabled && model.canCollectCard;
+    final canCollect = canInteract && model.canCollectCard;
     return Center(
       child: Transform.translate(
         offset: reducedMotion
@@ -503,8 +546,16 @@ class _CardDrawState extends State<CardDraw> with TickerProviderStateMixin {
             child: ExcludeSemantics(
               excluding: model.isDrawing,
               child: Semantics(
+                key: centralSemanticsKey,
+                container: true,
+                excludeSemantics: true,
+                label: [front.name, front.address, front.notes]
+                    .whereType<String>()
+                    .where((value) => value.isNotEmpty)
+                    .join('，'),
                 liveRegion: !model.isDrawing,
                 button: canCollect,
+                onTap: canCollect ? collectCentralCard : null,
                 hint: canCollect ? '点击大卡，收入本餐' : null,
                 child: KeyedSubtree(
                   key: collectionSourceKey,
@@ -528,41 +579,10 @@ class _CardDrawState extends State<CardDraw> with TickerProviderStateMixin {
     );
   }
 
-  Widget tutorialGuidance() {
-    final collect = !model.isSingleTarget && model.cardCentralResult != null;
-    return Row(
-      children: [
-        Expanded(
-          child: Semantics(
-            liveRegion: true,
-            child: Text(
-              collect
-                  ? '点击大卡，收入本餐'
-                  : model.cardCentralResult != null
-                  ? '喜欢就确认，也可以换一个'
-                  : '点一下选中，再点一下翻开',
-              key: const Key('card-guidance'),
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                height: 1.4,
-              ),
-            ),
-          ),
-        ),
-        TextButton(
-          key: const Key('skip-card-tutorial'),
-          onPressed: widget.paused || model.isBusy
-              ? null
-              : () => model.dismissCardTutorial(includeCollection: true),
-          child: const Text('跳过引导'),
-        ),
-      ],
-    );
-  }
-
-  Widget collectedRow() {
+  Widget collectedRow({required bool canInteract}) {
     final colors = Theme.of(context).colorScheme;
     final indexes = model.collectedCardResultIndexes;
+    final enabled = canInteract && !model.hasPendingReplacement;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -587,13 +607,17 @@ class _CardDrawState extends State<CardDraw> with TickerProviderStateMixin {
                 Padding(
                   padding: const EdgeInsets.only(right: 10),
                   child: Semantics(
+                    container: true,
+                    excludeSemantics: true,
+                    label: model.results[index].name,
                     selected: model.focusedResultIndex == index,
                     button: true,
+                    enabled: enabled,
+                    onTap: enabled ? () => model.focusResult(index) : null,
                     child: InkWell(
                       key: ValueKey('collected-card-$index'),
-                      onTap: interactionsEnabled && !model.hasPendingReplacement
-                          ? () => model.focusResult(index)
-                          : null,
+                      excludeFromSemantics: true,
+                      onTap: enabled ? () => model.focusResult(index) : null,
                       borderRadius: BorderRadius.circular(12),
                       child: Opacity(
                         opacity: collectingOption?.id == model.results[index].id
@@ -648,9 +672,15 @@ class _CardDrawState extends State<CardDraw> with TickerProviderStateMixin {
     );
   }
 
-  Widget fanCard(int index, int count, double viewport) {
+  Widget fanCard(
+    int index,
+    int count,
+    double viewport,
+    int itemSlot, {
+    required bool enabled,
+    bool overlay = false,
+  }) {
     final selected = model.selectedCardIndex == index;
-    final enabled = interactionsEnabled && model.canDraw;
     final offset = browsing.hasClients ? browsing.offset : 0.0;
     final viewCenter = offset + viewport / 2;
     final progress = shuffle.value;
@@ -683,63 +713,61 @@ class _CardDrawState extends State<CardDraw> with TickerProviderStateMixin {
     final opacity = flowing && count > 1
         ? 1 - fadeWeight * (1 - edgeFade)
         : 1.0;
-    return Positioned(
-      key: ValueKey('fan-position-$index'),
-      left: (viewCenter - cardWidth / 2) * (1 - spread) + left * spread,
+    final origin = overlay
+        ? offset
+        : fanInset(count, viewport) + itemSlot * cardStep;
+    final art = Positioned(
+      key: overlay ? null : ValueKey('fan-position-$index'),
+      left:
+          (viewCenter - cardWidth / 2) * (1 - spread) + left * spread - origin,
       top: 28 * (1 - spread) + top * spread,
       child: Transform.rotate(
         angle: selected ? angle * (1 - selection.value) : angle * spread,
         child: Opacity(
-          opacity: opacity,
-          child: Semantics(
-            label: '第 ${index + 1} 张牌',
-            hint: selected ? '再点一次翻开' : '点一下选中',
-            selected: selected,
-            button: true,
-            enabled: enabled,
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                key: ValueKey('candidate-card-$index'),
-                onTap: enabled ? () => tapCard(index) : null,
-                borderRadius: BorderRadius.circular(10),
-                child: SizedBox(
-                  width: cardWidth,
-                  height: cardHeight,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      const _CardBack(),
-                      if (selected)
-                        DecoratedBox(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: Theme.of(context).colorScheme.primary,
-                              width: 2,
+          opacity: selected && !overlay ? 0 : opacity,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              key: overlay ? null : ValueKey('candidate-card-$index'),
+              excludeFromSemantics: true,
+              onTap: enabled ? () => tapCard(index) : null,
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                width: cardWidth,
+                height: cardHeight,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    const _CardBack(),
+                    if (selected)
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.primary,
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    if (selected)
+                      Positioned(
+                        bottom: 8,
+                        left: 29,
+                        child: ExcludeSemantics(
+                          child: CircleAvatar(
+                            radius: 12,
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.primary,
+                            child: Icon(
+                              Icons.check,
+                              size: 16,
+                              color: Theme.of(context).colorScheme.onPrimary,
                             ),
                           ),
                         ),
-                      if (selected)
-                        Positioned(
-                          bottom: 8,
-                          left: 29,
-                          child: ExcludeSemantics(
-                            child: CircleAvatar(
-                              radius: 12,
-                              backgroundColor: Theme.of(
-                                context,
-                              ).colorScheme.primary,
-                              child: Icon(
-                                Icons.check,
-                                size: 16,
-                                color: Theme.of(context).colorScheme.onPrimary,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -747,33 +775,59 @@ class _CardDrawState extends State<CardDraw> with TickerProviderStateMixin {
         ),
       ),
     );
+    if (overlay) {
+      return Positioned(
+        left: art.left,
+        top: art.top,
+        // A translucent tap target protects the entire raised face, including
+        // its overlap with the next slot. Its ignored artwork lets hit testing
+        // continue into the list, so horizontal drags share the gesture arena.
+        child: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          excludeFromSemantics: true,
+          onTap: enabled ? () => tapCard(index) : null,
+          child: IgnorePointer(child: ExcludeSemantics(child: art.child)),
+        ),
+      );
+    }
+    return Semantics(
+      key: ValueKey('card-semantics-$index'),
+      container: true,
+      excludeSemantics: true,
+      label: '第 ${index + 1} 张牌，共 $count 张',
+      hint: selected ? '再点一次翻开' : '点一下选中',
+      selected: selected,
+      button: true,
+      enabled: enabled,
+      onTap: enabled ? () => tapCard(index) : null,
+      onDidGainAccessibilityFocus: () {
+        // Focus only brings this logical slot into view; activation chooses it.
+        if (!browsing.hasClients || !interactionsEnabled) return;
+        final start = fanInset(count, viewport) + index * cardStep;
+        final end = start + cardStep;
+        if (start < browsing.offset || end > browsing.offset + viewport) {
+          browsing.jumpTo(
+            (start < browsing.offset ? start : end - viewport).clamp(
+              0.0,
+              browsing.position.maxScrollExtent,
+            ),
+          );
+        }
+      },
+      child: Stack(clipBehavior: Clip.none, children: [art]),
+    );
   }
+
+  double shuffleTravel(int count) =>
+      math.min(9, count) * shuffleLaps.toDouble();
 
   double shuffleSlot(int index, int count, double progress) {
     // One continuous fan avoids internal wrap/fade seams when browsing is
-    // centered. Keep the original nine-card travel distance, regardless of
-    // deck size. Integer travel ends on the same grid of identical card backs;
+    // centered. Retain two laps across at most nine slots with 48dp spacing.
+    // Integer travel ends on the same grid of identical card backs;
     // identities resume their resting positions before selection is enabled.
-    final travel = math.min(9, count) * shuffleLaps;
+    final travel = shuffleTravel(count);
     return (index - Curves.easeInOut.transform(progress) * travel) % count;
-  }
-
-  Iterable<int> fanOrder(int count) {
-    final indexes = List.generate(count, (index) => index);
-    if (!shuffling) return indexes;
-    final progress = initialShuffle
-        ? ((shuffle.value - .32) / .68).clamp(0.0, 1.0)
-        : shuffle.value;
-    // Arc circulation follows the visible slot's depth, as in the approved
-    // prototype; wrapped cards fade at the edge rather than returning behind.
-    indexes.sort(
-      (left, right) => shuffleSlot(
-        left,
-        count,
-        progress,
-      ).compareTo(shuffleSlot(right, count, progress)),
-    );
-    return indexes;
   }
 }
 

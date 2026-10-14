@@ -70,7 +70,14 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> browseFirstCard(WidgetTester tester) async {
+    final fan = tester.widget<ListView>(key('card-fan-scroll'));
+    fan.controller!.jumpTo(0);
+    await tester.pump();
+  }
+
   Future<void> reveal(WidgetTester tester) async {
+    await browseFirstCard(tester);
     await tap(tester, key('candidate-card-0'));
     await tap(tester, key('candidate-card-0'));
   }
@@ -244,6 +251,7 @@ void main() {
         expect(key('replacement-start'), findsNothing);
         if (mode == DrawMode.cards) {
           await tester.pumpAndSettle();
+          await browseFirstCard(tester);
           await tap(tester, key('candidate-card-0'));
           await tester.tap(key('candidate-card-0'));
         }

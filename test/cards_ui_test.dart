@@ -47,6 +47,18 @@ void main() {
   Finder key(String name) => find.byKey(ValueKey(name));
 
   Future<void> tap(WidgetTester tester, Finder target) async {
+    if (target.evaluate().isEmpty) {
+      final scrollable = find.descendant(
+        of: key('card-fan-scroll'),
+        matching: find.byType(Scrollable),
+      );
+      await tester.scrollUntilVisible(
+        target,
+        -200,
+        scrollable: scrollable,
+        maxScrolls: 30,
+      );
+    }
     await tester.ensureVisible(target);
     await tester.pumpAndSettle();
     await tester.tap(target);
@@ -117,13 +129,13 @@ void main() {
       await tap(tester, key('candidate-card-0'));
       final selected = controller.selectedCard!.id;
       expect(
-        tester.getSemantics(key('candidate-card-0')).label,
+        tester.getSemantics(key('card-semantics-0')).label,
         contains('第 1 张牌'),
       );
       for (final option in controller.cardDeck) {
         expect(find.text(option.name), findsNothing);
         expect(
-          tester.getSemantics(key('candidate-card-0')).label,
+          tester.getSemantics(key('card-semantics-0')).label,
           isNot(contains(option.name)),
         );
       }
@@ -209,7 +221,7 @@ void main() {
       await reveal(tester);
       final first = controller.cardCentralResult!;
       expect(key('collected-card-0'), findsNothing);
-      expect(find.text('点击大卡，收入本餐'), findsOneWidget);
+      expect(find.text('点击大卡，收入本餐'), findsNothing);
       await tap(tester, key('collect-central-card'));
       expect(controller.cardCentralResult, isNull);
       expect(key('collected-card-0'), findsOneWidget);
@@ -237,20 +249,33 @@ void main() {
       await mount(tester, reducedMotion: false, settleStage: false);
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('正在洗牌…'), findsOneWidget);
-      await tester.tap(key('candidate-card-0'), warnIfMissed: false);
+      final visibleCard = find
+          .byWidgetPredicate(
+            (widget) =>
+                widget is InkWell &&
+                widget.key.toString().contains('candidate-card-'),
+          )
+          .first;
+      final cardKey =
+          tester.widget<InkWell>(visibleCard).key! as ValueKey<String>;
+      final positionKey = cardKey.value.replaceFirst(
+        'candidate-card-',
+        'fan-position-',
+      );
+      await tester.tap(visibleCard, warnIfMissed: false);
       expect(controller.selectedCardIndex, isNull);
       await tester.tap(key('draw-back'));
       await tester.pumpAndSettle();
-      final before = tester.widget<Positioned>(key('fan-position-0'));
+      final before = tester.widget<Positioned>(key(positionKey));
       final ids = controller.cardDeck.map((option) => option.id).toList();
       await tester.pump(const Duration(seconds: 3));
-      final after = tester.widget<Positioned>(key('fan-position-0'));
+      final after = tester.widget<Positioned>(key(positionKey));
       expect(after.left, before.left);
       expect(after.top, before.top);
       await tester.tap(find.text('继续抽取'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 120));
-      final resumed = tester.widget<Positioned>(key('fan-position-0'));
+      final resumed = tester.widget<Positioned>(key(positionKey));
       expect(resumed.left, isNot(before.left));
       expect(controller.cardDeck.map((option) => option.id), ids);
       await tester.pumpAndSettle();
@@ -380,28 +405,27 @@ void main() {
     },
   );
 
-  testWidgets(
-    'first multi-card collection guidance survives completed basic tutorial',
-    (tester) async {
-      await tester.runAsync(controller.dismissCardTutorial);
-      expect(controller.preferences.cardTutorialDismissed, isTrue);
-      expect(controller.preferences.cardCollectionTutorialDismissed, isFalse);
-      controller.changeScenario(MealScenario.cook);
-      controller.changeCookingCount(3);
-      await mount(tester);
-      await reveal(tester);
-      expect(find.text('点击大卡，收入本餐'), findsOneWidget);
-      await tester.ensureVisible(key('collect-central-card'));
-      await tester.pumpAndSettle();
-      await tester.tap(key('collect-central-card'));
-      await tester.pump();
-      expect(key('collecting-card-position'), findsNothing);
-      expect(controller.cardCentralResult, isNull);
-      expect(key('collected-card-0'), findsOneWidget);
-      expect(tester.widget<InkWell>(key('candidate-card-0')).onTap, isNotNull);
-      expect(tester.takeException(), isNull);
-    },
-  );
+  testWidgets('multi-card collection works without tutorial guidance', (
+    tester,
+  ) async {
+    await tester.runAsync(controller.dismissCardTutorial);
+    expect(controller.preferences.cardTutorialDismissed, isTrue);
+    expect(controller.preferences.cardCollectionTutorialDismissed, isFalse);
+    controller.changeScenario(MealScenario.cook);
+    controller.changeCookingCount(3);
+    await mount(tester);
+    await reveal(tester);
+    expect(find.text('点击大卡，收入本餐'), findsNothing);
+    await tester.ensureVisible(key('collect-central-card'));
+    await tester.pumpAndSettle();
+    await tester.tap(key('collect-central-card'));
+    await tester.pump();
+    expect(key('collecting-card-position'), findsNothing);
+    expect(controller.cardCentralResult, isNull);
+    expect(key('collected-card-0'), findsOneWidget);
+    expect(tester.widget<InkWell>(key('candidate-card-0')).onTap, isNotNull);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'save failure retains central card and tutorial until retry succeeds',
@@ -429,24 +453,15 @@ void main() {
     },
   );
 
-  testWidgets('skip persists and later entries omit tutorial', (tester) async {
+  testWidgets('fresh entries omit tutorial and retain card interaction', (
+    tester,
+  ) async {
     await mount(tester);
-    await tester.ensureVisible(key('skip-card-tutorial'));
-    await tester.pumpAndSettle();
-    await tester.runAsync(() async {
-      await tester.tap(key('skip-card-tutorial'));
-      await controller.dismissCardTutorial();
-    });
-    await tester.pumpAndSettle();
     expect(key('skip-card-tutorial'), findsNothing);
     expect(key('card-guidance'), findsNothing);
-    final reopened = MealController(
-      repository: repository,
-      clock: () => DateTime(2026, 10, 10, 12),
-    );
-    await tester.runAsync(reopened.initialize);
-    expect(reopened.preferences.cardTutorialDismissed, isTrue);
-    reopened.dispose();
+    await reveal(tester);
+    expect(controller.result, isNotNull);
+    expect(key('card-guidance'), findsNothing);
   });
 
   for (final size in [const Size(375, 667), const Size(667, 375)]) {

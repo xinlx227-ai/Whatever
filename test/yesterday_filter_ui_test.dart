@@ -85,14 +85,26 @@ void main() {
       await tester.tap(find.byKey(const Key('stage-filter-button')));
       await tester.pump();
       expect(tester.widget<CardDraw>(find.byType(CardDraw)).paused, isTrue);
-      final position = find.byKey(const ValueKey('fan-position-0'));
+      final renderedPosition = find.byWidgetPredicate(
+        (widget) =>
+            widget is Positioned &&
+            widget.key.toString().contains('fan-position-'),
+      );
+      final position = find.byKey(
+        tester.widget<Positioned>(renderedPosition.first).key!,
+      );
       final before = tester.widget<Positioned>(position).left;
       await tester.pump(const Duration(seconds: 2));
       expect(tester.widget<Positioned>(position).left, before);
       await tester.tap(find.byTooltip('取消筛选'));
-      await tester.pumpAndSettle();
+      // Finish the sheet's reverse transition without settling the shuffle.
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 120));
       expect(tester.widget<CardDraw>(find.byType(CardDraw)).paused, isFalse);
       expect(tester.widget<Positioned>(position).left, isNot(before));
+      await tester.pumpAndSettle();
+      expect(find.text('正在洗牌…'), findsNothing);
       expect(controller.hasRound, isFalse);
       expect(controller.preferences.excludeYesterday, isFalse);
     },

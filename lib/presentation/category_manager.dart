@@ -135,13 +135,6 @@ class _CategoryManagerState extends State<CategoryManager> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Text(
-                      '内置分类可改名；保留一个兜底分类，接住暂时未归类的选项。',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        height: 1.5,
-                      ),
-                    ),
                     if (error != null) ...[
                       const SizedBox(height: 16),
                       Semantics(
@@ -398,18 +391,6 @@ class _CategoryEditorState extends State<_CategoryEditor> {
                             ? '请填写分类名称。'
                             : null,
                       ),
-                      if (widget.category != null) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          '改名会同步更新选项所属分类，已有足迹会保留。',
-                          style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                            height: 1.5,
-                          ),
-                        ),
-                      ],
                       if (error != null) ...[
                         const SizedBox(height: 16),
                         Semantics(

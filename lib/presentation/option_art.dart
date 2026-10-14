@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -26,6 +28,11 @@ class OptionArt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Bound both decoded dimensions, including unusually tall user photos.
+    // A two-times display budget preserves detail for ordinary cover crops.
+    final decodeExtent = (size * MediaQuery.devicePixelRatioOf(context) * 2)
+        .ceil()
+        .clamp(1, 2048);
     Widget fallback() => SvgPicture.asset(
       'assets/food/${defaultOptionArt(option)}.svg',
       width: size,
@@ -38,12 +45,13 @@ class OptionArt extends StatelessWidget {
             ? fallback()
             : ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.file(
-                  File(option.imagePath!),
+                child: Image(
+                  image: _BoundedFileImage(
+                    File(option.imagePath!),
+                    decodeExtent,
+                  ),
                   width: size,
                   height: size,
-                  cacheWidth: (size * MediaQuery.devicePixelRatioOf(context))
-                      .ceil(),
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) => fallback(),
                 ),
@@ -51,4 +59,37 @@ class OptionArt extends StatelessWidget {
       ),
     );
   }
+}
+
+// ResizeImagePolicy.fit can round the short side of extreme images to zero.
+// Keep aspect ratio to pixel precision with a positive bounded decode size.
+class _BoundedFileImage extends FileImage {
+  const _BoundedFileImage(super.file, this.extent);
+
+  final int extent;
+
+  @override
+  ImageStreamCompleter loadImage(FileImage key, ImageDecoderCallback decode) =>
+      super.loadImage(
+        key,
+        (buffer, {getTargetSize}) => decode(
+          buffer,
+          getTargetSize: (width, height) {
+            final scale = math.min(1.0, extent / math.max(width, height));
+            return ui.TargetImageSize(
+              width: math.max(1, (width * scale).round()),
+              height: math.max(1, (height * scale).round()),
+            );
+          },
+        ),
+      );
+
+  @override
+  bool operator ==(Object other) =>
+      other is _BoundedFileImage &&
+      other.file.path == file.path &&
+      other.extent == extent;
+
+  @override
+  int get hashCode => Object.hash(file.path, extent);
 }

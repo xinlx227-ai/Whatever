@@ -16,6 +16,10 @@ android {
 
     defaultConfig {
         applicationId = "com.xinlx227.whatever"
+        // Opt-in isolated installation for ordinary manual device checks.
+        val verificationBuild = providers.gradleProperty("verificationBuild").orNull == "true"
+        if (verificationBuild) applicationIdSuffix = ".verification"
+        manifestPlaceholders["appLabel"] = if (verificationBuild) "这一餐·验证" else "这一餐"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

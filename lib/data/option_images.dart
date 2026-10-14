@@ -37,7 +37,17 @@ class OptionImages {
 
   Future<String> persist(String source, {String? existingPath}) async {
     final bytes = await File(source).readAsBytes();
-    final codec = await ui.instantiateImageCodec(bytes, targetWidth: 1600);
+    final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
+    final codec = await ui.instantiateImageCodecWithSize(
+      buffer,
+      getTargetSize: (width, height) {
+        final scale = min(1.0, 1600 / max(width, height));
+        return ui.TargetImageSize(
+          width: max(1, (width * scale).round()),
+          height: max(1, (height * scale).round()),
+        );
+      },
+    );
     try {
       final frame = await codec.getNextFrame();
       frame.image.dispose();

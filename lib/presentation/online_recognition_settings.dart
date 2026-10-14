@@ -81,10 +81,6 @@ class _OnlineRecognitionSettingsPageState
             value: widget.controller.onlineSettings.enabled,
             onChanged: busy ? null : change,
           ),
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('在线结果仅作辅助，随时可手动修改或直接保存。网络不可用时，本地功能照常使用。'),
-          ),
           if (error != null)
             Padding(padding: const EdgeInsets.all(16), child: Text(error!)),
         ],

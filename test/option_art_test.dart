@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +8,76 @@ import 'package:whatever/domain/meal.dart';
 import 'package:whatever/presentation/option_art.dart';
 
 void main() {
+  testWidgets('extreme photos have bounded aspect-preserving display decodes', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final directory = (await tester.runAsync(
+      () => Directory.systemTemp.createTemp('bounded-art-'),
+    ))!;
+    addTearDown(() => directory.delete(recursive: true));
+    for (final dimensions in [const Size(20, 12000), const Size(12000, 20)]) {
+      final recorder = ui.PictureRecorder();
+      Canvas(recorder).drawColor(Colors.orange, BlendMode.src);
+      final picture = recorder.endRecording();
+      final original = (await tester.runAsync(
+        () => picture.toImage(
+          dimensions.width.toInt(),
+          dimensions.height.toInt(),
+        ),
+      ))!;
+      final bytes = (await tester.runAsync(
+        () => original.toByteData(format: ui.ImageByteFormat.png),
+      ))!.buffer.asUint8List();
+      picture.dispose();
+      original.dispose();
+      final file = File('${directory.path}/${dimensions.width}.png');
+      await tester.runAsync(() => file.writeAsBytes(bytes));
+      await tester.runAsync(
+        () => tester.pumpWidget(
+          MaterialApp(
+            home: OptionArt(
+              option: FoodOption(
+                id: 'extreme',
+                name: '长图',
+                art: 'plate',
+                periods: {MealPeriod.lunch},
+                imagePath: file.path,
+              ),
+              size: 48,
+            ),
+          ),
+        ),
+      );
+      final provider = tester.widget<Image>(find.byType(Image)).image;
+      final stream = (await tester.runAsync(
+        () async => provider.resolve(const ImageConfiguration()),
+      ))!;
+      ImageInfo? decoded;
+      final listener = ImageStreamListener((info, _) {
+        decoded = info;
+      });
+      stream.addListener(listener);
+      await tester.runAsync(() async {
+        final deadline = DateTime.now().add(const Duration(seconds: 10));
+        while (decoded == null && DateTime.now().isBefore(deadline)) {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+      });
+      expect(decoded, isNotNull);
+      expect(decoded!.image.width, inInclusiveRange(1, 96));
+      expect(decoded!.image.height, inInclusiveRange(1, 96));
+      expect(
+        decoded!.image.width > decoded!.image.height,
+        dimensions.width > dimensions.height,
+      );
+      expect(await tester.runAsync(() => file.readAsBytes()), bytes);
+      stream.removeListener(listener);
+      decoded!.dispose();
+    }
+  });
+
   testWidgets('every default illustration loads without missing assets', (
     tester,
   ) async {

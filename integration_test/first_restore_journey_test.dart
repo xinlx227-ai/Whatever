@@ -58,6 +58,11 @@ void main() {
       }
 
       Future<void> reveal() async {
+        // Build the first logical card through its scroll position before using
+        // its finder; the full deck intentionally renders only the visible fan.
+        final fan = tester.widget<ListView>(key('card-fan-scroll'));
+        fan.controller!.jumpTo(0);
+        await tester.pump();
         await tap(key('candidate-card-0'));
         expect(model.selectedCardIndex, 0);
         await tap(key('candidate-card-0'));

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -191,6 +192,8 @@ class _MealHomeState extends State<_MealHome>
   double fromAngle = 0, toAngle = 0;
   WheelLayout? displayedWheel;
   bool asking = false;
+  final wheelResultKey = GlobalKey();
+  String? previousWheelResultId;
   MealController get model => widget.controller;
   bool get cardsMode => model.preferences.mode == DrawMode.cards;
   Color get paper => Theme.of(context).colorScheme.surface;
@@ -307,11 +310,22 @@ class _MealHomeState extends State<_MealHome>
       return;
     }
     model.finishDraw();
-    if (!cardsMode) wheelSettle.forward(from: 0);
+    if (!cardsMode) {
+      if (MediaQuery.disableAnimationsOf(context)) {
+        wheelSettle.value = 1;
+      } else {
+        wheelSettle.forward(from: 0);
+      }
+    }
     if (!backgrounded) HapticFeedback.lightImpact();
   }
 
   void modelChanged() {
+    final resultId = !cardsMode && !model.isDrawing ? model.result?.id : null;
+    if (resultId != previousWheelResultId) {
+      previousWheelResultId = resultId;
+      if (resultId != null) focusWheelResult(resultId);
+    }
     if (!model.hasRound) {
       resetWheel();
       cardReveal.stop(canceled: true);
@@ -321,6 +335,26 @@ class _MealHomeState extends State<_MealHome>
     if (model.restartNotice != null && stageOpen) {
       setState(() => stageOpen = false);
     }
+  }
+
+  void focusWheelResult(String optionId) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || !stageOpen || paused || model.result?.id != optionId) {
+        return;
+      }
+      final target = wheelResultKey.currentContext;
+      if (target == null || !MediaQuery.accessibleNavigationOf(context)) return;
+      // Only assistive navigation follows a newly revealed or reopened result.
+      // Ordinary drawing keeps the user's accepted stage scroll position.
+      await Scrollable.ensureVisible(target, alignment: .25);
+      if (!mounted ||
+          !target.mounted ||
+          model.result?.id != optionId ||
+          paused) {
+        return;
+      }
+      target.findRenderObject()?.sendSemanticsEvent(const FocusSemanticEvent());
+    });
   }
 
   void showRestartNotice() {
@@ -570,12 +604,6 @@ class _MealHomeState extends State<_MealHome>
                   Text('替换「$outgoingName」，其他选择会保留。'),
                   SizedBox(height: 12),
                   Text('重新抽：放回候选，可能再次抽中。\n排除它：这次使用应用期间不再抽中。'),
-                  SizedBox(height: 12),
-                  Text(
-                    cardsMode
-                        ? '选择后请重新选牌，再点一次翻开；也可以重新开始整餐。'
-                        : '选择后直接开始替换，不能撤销；也可以重新开始整餐。',
-                  ),
                   if (shortage != null) ...[
                     SizedBox(height: 12),
                     Semantics(
@@ -1088,53 +1116,71 @@ class _MealHomeState extends State<_MealHome>
   );
 
   List<Widget> wheelStage() => [
-    AnimatedBuilder(
-      animation: Listenable.merge([curve, wheelSettle]),
-      builder: (context, _) {
-        final growing = model.isDrawing
-            ? (spin.value / .05).clamp(0.0, 1.0)
-            : 0.0;
-        return Center(
-          child: SizedBox(
-            width: MediaQuery.disableAnimationsOf(context)
-                ? 180
-                : model.isDrawing
-                ? 260 + 80 * growing
-                : 340 - 160 * Curves.easeOutCubic.transform(wheelSettle.value),
-            child: MealWheel(
-              options: model.candidates,
-              layout: displayedWheel,
-              centerLabel: scenarioCopy.wheelLabel,
-              angle: MediaQuery.disableAnimationsOf(context)
-                  ? toAngle
-                  : fromAngle + (toAngle - fromAngle) * curve.value,
+    Semantics(
+      key: const Key('wheel-status'),
+      container: true,
+      liveRegion: true,
+      label:
+          '转盘，共 ${(displayedWheel?.sectors.expand((sector) => sector.optionIds).length ?? model.candidates.length)} 个候选',
+      value: model.isDrawing ? '正在挑选' : '已揭晓',
+      child: AnimatedBuilder(
+        animation: Listenable.merge([curve, wheelSettle]),
+        builder: (context, _) {
+          final growing = model.isDrawing
+              ? (spin.value / .05).clamp(0.0, 1.0)
+              : 0.0;
+          return Center(
+            child: SizedBox(
+              width: MediaQuery.disableAnimationsOf(context)
+                  ? 180
+                  : model.isDrawing
+                  ? 260 + 80 * growing
+                  : 340 -
+                        160 * Curves.easeOutCubic.transform(wheelSettle.value),
+              child: MealWheel(
+                options: model.candidates,
+                layout: displayedWheel,
+                centerLabel: scenarioCopy.wheelLabel,
+                angle: MediaQuery.disableAnimationsOf(context)
+                    ? toAngle
+                    : fromAngle + (toAngle - fromAngle) * curve.value,
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     ),
     const SizedBox(height: 16),
     if (model.isDrawing)
       Padding(
         padding: const EdgeInsets.symmetric(vertical: 48),
-        child: Text(
-          '正在挑选…',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: muted),
+        child: ExcludeSemantics(
+          child: Text(
+            '正在挑选…',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: muted),
+          ),
         ),
       )
     else ...[
       if (model.result case final option?) ...[
         Center(child: OptionArt(option: option, size: 128)),
         const SizedBox(height: 16),
-        Text(
-          option.name,
-          key: const Key('draw-result'),
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-            height: 1.3,
+        Semantics(
+          key: wheelResultKey,
+          container: true,
+          label: '抽取结果：${option.name}',
+          child: ExcludeSemantics(
+            child: Text(
+              option.name,
+              key: const Key('draw-result'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+                height: 1.3,
+              ),
+            ),
           ),
         ),
         if (option.address != null)
@@ -1152,26 +1198,40 @@ class _MealHomeState extends State<_MealHome>
               for (var index = 0; index < model.results.length; index++)
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: OutlinedButton(
-                    key: ValueKey('cooking-result-$index'),
-                    onPressed:
-                        model.hasPendingReplacement ||
-                            model.hasConfirmationAttempt
-                        ? null
-                        : () => model.focusResult(index),
-                    style: OutlinedButton.styleFrom(
-                      backgroundColor: model.focusedResultIndex == index
-                          ? soft
-                          : null,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: math.min(
+                        320,
+                        MediaQuery.sizeOf(context).width - 48,
+                      ),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Column(
-                        children: [
-                          OptionArt(option: model.results[index], size: 48),
-                          const SizedBox(height: 6),
-                          Text(model.results[index].name),
-                        ],
+                    child: OutlinedButton(
+                      key: ValueKey('cooking-result-$index'),
+                      onPressed:
+                          model.hasPendingReplacement ||
+                              model.hasConfirmationAttempt
+                          ? null
+                          : () => model.focusResult(index),
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: model.focusedResultIndex == index
+                            ? soft
+                            : null,
+                      ),
+                      child: Semantics(
+                        selected: model.focusedResultIndex == index,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Column(
+                            children: [
+                              OptionArt(option: model.results[index], size: 48),
+                              const SizedBox(height: 6),
+                              Text(
+                                model.results[index].name,
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -1196,8 +1256,10 @@ class _MealHomeState extends State<_MealHome>
           onPressed: model.canDraw && !paused ? draw : null,
           child: Text(model.isDrawing ? '正在挑选…' : '再转一道'),
         ),
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        spacing: 16,
+        runSpacing: 8,
         children: [
           TextButton(
             key: const Key('restart-round'),
@@ -1209,7 +1271,12 @@ class _MealHomeState extends State<_MealHome>
             onPressed: focus != null && model.canReplace(focus) && !paused
                 ? () => replace(focus)
                 : null,
-            child: const Text('换一个'),
+            child: Text(
+              '换一个',
+              semanticsLabel: focus == null
+                  ? '换一个'
+                  : '替换「${model.results[focus].name}」',
+            ),
           ),
         ],
       ),
@@ -1227,12 +1294,6 @@ class _MealHomeState extends State<_MealHome>
                 ? '就做这 ${model.results.length} 道菜'
                 : scenarioCopy.confirmAction,
           ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          '确认之后，才会记入足迹',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: muted, fontSize: 12),
         ),
       ],
     ];

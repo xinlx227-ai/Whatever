@@ -44,10 +44,17 @@ void main() {
   Finder key(String value) => find.byKey(ValueKey(value));
 
   ScrollController browsing(WidgetTester tester) =>
-      tester.widget<SingleChildScrollView>(key('card-fan-scroll')).controller!;
+      tester.widget<ListView>(key('card-fan-scroll')).controller!;
 
-  double left(WidgetTester tester, int index) =>
-      tester.widget<Positioned>(key('fan-position-$index')).left!;
+  double left(WidgetTester tester, int index) {
+    final slot = find
+        .ancestor(of: key('fan-position-$index'), matching: find.byType(Stack))
+        .first;
+    return tester.widget<Positioned>(key('fan-position-$index')).left! +
+        tester.getTopLeft(slot).dx -
+        tester.getTopLeft(key('card-fan-scroll')).dx +
+        browsing(tester).offset;
+  }
 
   double opacity(WidgetTester tester, int index) => tester
       .widget<Opacity>(
@@ -63,16 +70,17 @@ void main() {
     bool settle = true,
     bool paused = false,
     bool reducedMotion = false,
+    double width = 430,
   }) async {
     tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(430, 1000);
+    tester.view.physicalSize = Size(width, 1000);
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
     await tester.pumpWidget(
       MaterialApp(
         home: MediaQuery(
           data: MediaQueryData(
-            size: const Size(430, 1000),
+            size: Size(width, 1000),
             disableAnimations: reducedMotion,
           ),
           child: Scaffold(
@@ -184,7 +192,9 @@ void main() {
     testWidgets(
       '${replacement ? 'replacement' : 'initial'} shuffle keeps original travel and timing without scrolling',
       (tester) async {
-        await mount(tester, settle: replacement);
+        // A wide viewport keeps the tracked card rendered for its complete
+        // circulation; large-deck virtualization is checked separately.
+        await mount(tester, settle: replacement, width: 2000);
         if (replacement) {
           revealAndCollect(8);
           await tester.pumpAndSettle();
@@ -207,7 +217,7 @@ void main() {
           final currentLeft = left(tester, 11);
           if (currentLeft > previousLeft + 100) {
             distance +=
-                previousLeft - currentLeft + controller.cardDeck.length * 44;
+                previousLeft - currentLeft + controller.cardDeck.length * 48;
           } else {
             expect(currentLeft, lessThanOrEqualTo(previousLeft + .001));
             distance += previousLeft - currentLeft;
@@ -215,7 +225,7 @@ void main() {
           previousLeft = currentLeft;
           expect(scroll.offset, closeTo(midpoint, .01));
         }
-        expect(distance, closeTo(18 * 44, .02));
+        expect(distance, closeTo(18 * 48, .02));
         expect(find.text('正在洗牌…'), findsOneWidget);
         await tester.pump(const Duration(milliseconds: 1));
         expect(find.text('正在洗牌…'), findsNothing);
@@ -240,17 +250,24 @@ void main() {
       await tester.pump(const Duration(milliseconds: 16));
       final scroll = browsing(tester);
       final viewport = tester.getSize(key('card-fan-scroll')).width;
-      final visible = List.generate(14, (index) => index).where((index) {
-        final x = left(tester, index) - scroll.offset;
-        return x > 30 && x + 82 < viewport - 30;
-      }).toList()..sort((a, b) => left(tester, a).compareTo(left(tester, b)));
+      final visible =
+          List.generate(14, (index) => index)
+              .where(
+                (index) => key('fan-position-$index').evaluate().isNotEmpty,
+              )
+              .where((index) {
+                final x = left(tester, index) - scroll.offset;
+                return x > 30 && x + 82 < viewport - 30;
+              })
+              .toList()
+            ..sort((a, b) => left(tester, a).compareTo(left(tester, b)));
       for (final index in visible) {
         expect(opacity(tester, index), 1, reason: 'interior card $index fades');
       }
       for (var index = 1; index < visible.length; index++) {
         expect(
           left(tester, visible[index]) - left(tester, visible[index - 1]),
-          closeTo(44, .01),
+          closeTo(48, .01),
           reason: 'visible fan has an internal circulation seam',
         );
       }
@@ -260,7 +277,7 @@ void main() {
   testWidgets('circulation moves left and wraps only while faded out', (
     tester,
   ) async {
-    await mount(tester, settle: false);
+    await mount(tester, settle: false, width: 2000);
     await tester.pump(const Duration(milliseconds: 660));
     final before = left(tester, 11);
     await tester.pump(const Duration(milliseconds: 100));
