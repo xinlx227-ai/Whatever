@@ -4,6 +4,20 @@ Implementation branch: `codex/issue-16-accessible-large-pools`.
 Baseline: `73d85bd2e94350d2c6ea6e6abb34026a29f9b9b9`.
 Date: 2026-10-13, Asia/Shanghai.
 
+## Local main delivery — 2026-10-14
+
+The user authorized committing and merging the implementation. Feature commit
+`314ff6e` was fast-forwarded from `codex/issue-16-accessible-large-pools` into
+local `main` without conflicts. Post-merge `flutter analyze --no-pub` passed and
+`flutter test --no-pub` passed all **446 tests**, including the final UI cleanup.
+Logs: `build/issue16/main-analyze.log` and `build/issue16/main-tests.log`.
+The committed diff passed whitespace checks. These checks supersede the earlier
+45-test-only validation limit for the final source; emulator performance and
+native evidence retain their original build scope and were not rerun.
+
+Remote push, branch cleanup and issue closure remain pending separate delivery
+authorization. The accepted deferred-performance decision below is unchanged.
+
 ## Current acceptance decision — 2026-10-14
 
 The user accepted ordinary-scale manual phone use after the UI cleanup and
@@ -24,7 +38,8 @@ The latest 45 related UI tests and static analysis passed; logs are
 `build/issue16/ui-copy-tests.log` and `build/issue16/ui-copy-analyze.log`.
 The isolated build passed in `build/issue16/ui-copy-phone-isolated.log`.
 The earlier 446-test suite, native checks and performance matrix belong to the
-pre-cleanup build; they were not rerun as a full suite/matrix for this APK.
+pre-cleanup build. The full suite was subsequently rerun on merged main as noted
+above; native checks and the performance matrix were not rerun for this APK.
 
 The user reported no remaining issues in ordinary phone use. This is subjective
 manual experience evidence, not a per-item certification of maximum font/display
